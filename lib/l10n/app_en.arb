@@ -1,0 +1,58 @@
+{
+  "@@locale": "en",
+
+  "appName": "Kavakeb",
+
+  "splashSubtitle": "Your daily guide to inspiration and self-discovery",
+  "splashDisclaimer": "Kavakeb is a space for entertainment, self-discovery, and inspiration drawn from traditional and symbolic knowledge. Its content is not scientific or definitive prediction, and should not replace important life, medical, financial, or legal decisions. Join us with an open, playful mind ✨",
+
+  "signupTitle": "Sign Up",
+  "signupCountryLabel": "Country",
+  "signupPhoneHint": "Mobile number",
+  "signupEmailHint": "Email address",
+  "signupCodeHint": "6-digit code",
+  "signupSendCode": "Send code",
+  "signupResendCode": "Resend",
+  "signupContinue": "Continue",
+  "signupNameHint": "Full name",
+  "signupBirthDateLabel": "Date of birth",
+  "signupCalendarShamsi": "Persian",
+  "signupCalendarGregorian": "Gregorian",
+  "signupCalendarHijri": "Hijri",
+  "signupDayHint": "Day",
+  "signupMonthHint": "Month",
+  "signupYearHint": "Year",
+  "signupGenderMale": "Male",
+  "signupGenderFemale": "Female",
+  "signupPhoneDigitsHelper": "{min} to {max} digits (no leading zero)",
+  "@signupPhoneDigitsHelper": {
+    "placeholders": {"min": {"type": "int"}, "max": {"type": "int"}}
+  },
+
+  "homeGreeting": "Hi {name} 🌙",
+  "@homeGreeting": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "homeTodayMessage": "Today's Message",
+  "homeTodayCard": "Today's Card",
+  "homeViewInterpretation": "View interpretation",
+  "homeTodayLuck": "Today's Luck",
+  "homeLuckColor": "Lucky color",
+  "homeLuckNumber": "Lucky number",
+  "homeLuckHour": "Best hour",
+  "homeTodayElement": "Today's element",
+  "homeQuickHafez": "Hafez Fortune",
+  "homeQuickIstikhara": "Istikhara",
+  "homeQuickDream": "Dream Interpretation",
+  "homeQuickAssistant": "Smart Assistant",
+  "homeDestinyBookTitle": "Book of Destiny",
+  "homeDestinyBookSubtitle": "Discover the secrets of your name and birth date",
+  "homeTotalPoints": "Total points",
+  "homeStreakLabel": "Great! Keep it up",
+
+  "navHome": "Home",
+  "navFals": "Fortunes",
+  "navAI": "AI",
+  "navLearning": "Learn",
+  "navProfile": "Profile"
+}

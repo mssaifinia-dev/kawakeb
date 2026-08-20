@@ -1,0 +1,58 @@
+{
+  "@@locale": "ar",
+
+  "appName": "كواكب",
+
+  "splashSubtitle": "دليلك اليومي للإلهام ومعرفة الذات",
+  "splashDisclaimer": "كواكب هو مساحة للترفيه ومعرفة الذات والإلهام المستوحى من المعارف التقليدية والرمزية. محتوى هذا التطبيق ليس علميًا أو تنبؤًا قطعيًا، ولا ينبغي أن يحل محل القرارات المهمة في الحياة أو الطبية أو المالية أو القانونية. انضم إلينا بعقل منفتح ومرح ✨",
+
+  "signupTitle": "التسجيل",
+  "signupCountryLabel": "الدولة",
+  "signupPhoneHint": "رقم الجوال",
+  "signupEmailHint": "البريد الإلكتروني",
+  "signupCodeHint": "رمز مكوّن من ٦ أرقام",
+  "signupSendCode": "إرسال الرمز",
+  "signupResendCode": "إعادة الإرسال",
+  "signupContinue": "متابعة",
+  "signupNameHint": "الاسم الكامل",
+  "signupBirthDateLabel": "تاريخ الميلاد",
+  "signupCalendarShamsi": "الشمسي",
+  "signupCalendarGregorian": "الميلادي",
+  "signupCalendarHijri": "الهجري",
+  "signupDayHint": "اليوم",
+  "signupMonthHint": "الشهر",
+  "signupYearHint": "السنة",
+  "signupGenderMale": "ذكر",
+  "signupGenderFemale": "أنثى",
+  "signupPhoneDigitsHelper": "{min} إلى {max} أرقام (بدون صفر في البداية)",
+  "@signupPhoneDigitsHelper": {
+    "placeholders": {"min": {"type": "int"}, "max": {"type": "int"}}
+  },
+
+  "homeGreeting": "مرحبًا {name} 🌙",
+  "@homeGreeting": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "homeTodayMessage": "رسالة اليوم",
+  "homeTodayCard": "بطاقة اليوم",
+  "homeViewInterpretation": "عرض التفسير",
+  "homeTodayLuck": "حظ اليوم",
+  "homeLuckColor": "اللون المقترح",
+  "homeLuckNumber": "الرقم المحظوظ",
+  "homeLuckHour": "الساعة المناسبة",
+  "homeTodayElement": "عنصر اليوم",
+  "homeQuickHafez": "فال حافظ",
+  "homeQuickIstikhara": "الاستخارة",
+  "homeQuickDream": "تفسير الأحلام",
+  "homeQuickAssistant": "المساعد الذكي",
+  "homeDestinyBookTitle": "كتاب القدر",
+  "homeDestinyBookSubtitle": "اكتشف أسرار اسمك وتاريخ ميلادك",
+  "homeTotalPoints": "مجموع النقاط",
+  "homeStreakLabel": "أحسنت! استمر",
+
+  "navHome": "الرئيسية",
+  "navFals": "الفأل",
+  "navAI": "الذكاء الاصطناعي",
+  "navLearning": "تعلّم",
+  "navProfile": "الملف الشخصي"
+}

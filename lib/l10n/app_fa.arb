@@ -1,0 +1,59 @@
+{
+  "@@locale": "fa",
+
+  "appName": "کواکب",
+  "@appName": {"description": "App name shown on splash"},
+
+  "splashSubtitle": "راهنمای روزانه‌ی شما برای الهام و خودشناسی",
+  "splashDisclaimer": "کواکب یک فضای سرگرمی، خودشناسی و الهام‌گیری از دانش‌های سنتی و نمادین است. محتوای این اپ جنبه‌ی علمی یا پیش‌گویی قطعی ندارد و نباید جایگزین تصمیم‌های مهم زندگی، پزشکی، مالی یا حقوقی شود. با ذهنی باز و سرگرم‌کننده همراه ما باش ✨",
+
+  "signupTitle": "ثبت‌نام",
+  "signupCountryLabel": "کشور",
+  "signupPhoneHint": "شماره موبایل",
+  "signupEmailHint": "آدرس ایمیل",
+  "signupCodeHint": "کد ۶ رقمی",
+  "signupSendCode": "ارسال کد",
+  "signupResendCode": "ارسال دوباره",
+  "signupContinue": "ادامه",
+  "signupNameHint": "نام و نام‌خانوادگی",
+  "signupBirthDateLabel": "تاریخ تولد",
+  "signupCalendarShamsi": "شمسی",
+  "signupCalendarGregorian": "میلادی",
+  "signupCalendarHijri": "قمری",
+  "signupDayHint": "روز",
+  "signupMonthHint": "ماه",
+  "signupYearHint": "سال",
+  "signupGenderMale": "آقا",
+  "signupGenderFemale": "خانم",
+  "signupPhoneDigitsHelper": "{min} تا {max} رقم (بدون صفر ابتدایی)",
+  "@signupPhoneDigitsHelper": {
+    "placeholders": {"min": {"type": "int"}, "max": {"type": "int"}}
+  },
+
+  "homeGreeting": "سلام {name} 🌙",
+  "@homeGreeting": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "homeTodayMessage": "پیام امروز",
+  "homeTodayCard": "کارت امروز",
+  "homeViewInterpretation": "مشاهده تفسیر",
+  "homeTodayLuck": "شانس امروز",
+  "homeLuckColor": "رنگ پیشنهادی",
+  "homeLuckNumber": "عدد شانس",
+  "homeLuckHour": "ساعت مناسب",
+  "homeTodayElement": "عنصر امروز",
+  "homeQuickHafez": "فال حافظ",
+  "homeQuickIstikhara": "استخاره",
+  "homeQuickDream": "تعبیر خواب",
+  "homeQuickAssistant": "دستیار هوشمند",
+  "homeDestinyBookTitle": "کتاب سرنوشت",
+  "homeDestinyBookSubtitle": "رازهای اسم و تاریخ تولدت رو کشف کن",
+  "homeTotalPoints": "امتیاز کل",
+  "homeStreakLabel": "آفرین! عالی پیش می‌روی",
+
+  "navHome": "خانه",
+  "navFals": "فال‌ها",
+  "navAI": "هوش مصنوعی",
+  "navLearning": "آموزش",
+  "navProfile": "پروفایل"
+}

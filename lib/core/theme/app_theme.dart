@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
@@ -7,6 +8,7 @@ class AppTheme {
 
   static ThemeData get darkTheme {
     return ThemeData(
+      fontFamily: 'Vazirmatn',
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: AppColors.background,
@@ -40,7 +42,9 @@ class AppTheme {
           disabledBackgroundColor: AppColors.buttonDisabled,
           disabledForegroundColor: AppColors.textDisabled,
           minimumSize: const Size.fromHeight(52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           textStyle: AppTextStyles.buttonPrimary,
           elevation: 0,
         ),
@@ -50,20 +54,27 @@ class AppTheme {
           backgroundColor: AppColors.purple,
           foregroundColor: AppColors.textOnPurple,
           minimumSize: const Size(0, 52),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
           side: const BorderSide(color: AppColors.borderGold),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.glassFill,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 16,
+        ),
         hintStyle: AppTextStyles.bodyMedium,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -75,7 +86,10 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+          borderSide: const BorderSide(
+            color: AppColors.gold,
+            width: 1.5,
+          ),
         ),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -85,8 +99,13 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
-      dividerTheme: const DividerThemeData(color: AppColors.glassBorder, thickness: 1),
-      iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.glassBorder,
+        thickness: 1,
+      ),
+      iconTheme: const IconThemeData(
+        color: AppColors.textPrimary,
+      ),
     );
   }
 }

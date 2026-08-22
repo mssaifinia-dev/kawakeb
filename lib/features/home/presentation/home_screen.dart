@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/star_field_background.dart';
 import '../../../core/widgets/zodiac_wheel.dart';
+import '../../../core/services/name_service.dart';
+import '../../../core/services/birthdate_service.dart';
+import '../../../core/utils/persian_date_converter.dart';
 import '../../tarot/presentation/tarot_home_screen.dart';
 import '../../hafez/presentation/hafez_screen.dart';
 import '../../istikhara/presentation/istikhara_screen.dart';
@@ -11,126 +13,39 @@ import '../../../shared/placeholder_screen.dart';
 import '../../dream_interpretation/presentation/dream_interpretation_screen.dart';
 import '../../daily_fortune/presentation/daily_fortune_card.dart';
 import '../../numerology/presentation/destiny_book_promo_card.dart';
-String _todayJalali() {
-  final now = DateTime.now();
+import '../../support/presentation/support_screen.dart';
+import '../../../core/services/support_service.dart';
+import '../../profile/presentation/profile_screen.dart';
 
-  final result = _gregorianToJalali(
-    now.year,
-    now.month,
-    now.day,
-  );
-
-  const weekdays = [
-    '',
-    'دوشنبه',
-    'سه‌شنبه',
-    'چهارشنبه',
-    'پنجشنبه',
-    'جمعه',
-    'شنبه',
-    'یکشنبه',
-  ];
-
-  const months = [
-    '',
-    'فروردین',
-    'اردیبهشت',
-    'خرداد',
-    'تیر',
-    'مرداد',
-    'شهریور',
-    'مهر',
-    'آبان',
-    'آذر',
-    'دی',
-    'بهمن',
-    'اسفند',
-  ];
-
-  return '${weekdays[now.weekday]} '
-      '${_toPersianDigits(result[2].toString())} '
-      '${months[result[1]]} '
-      '${_toPersianDigits(result[0].toString())}';
-}
-
-List<int> _gregorianToJalali(int gy, int gm, int gd) {
-  const gDays = [
-    0,
-    31,
-    59,
-    90,
-    120,
-    151,
-    181,
-    212,
-    243,
-    273,
-    304,
-    334,
-  ];
-
-  const jDays = [
-    0,
-    31,
-    62,
-    93,
-    124,
-    155,
-    186,
-    216,
-    246,
-    276,
-    306,
-    336,
-  ];
-
-  final gy2 = gm > 2 ? gy + 1 : gy;
-
-  int days = 355666 +
-      (365 * gy) +
-      ((gy2 + 3) ~/ 4) -
-      ((gy2 + 99) ~/ 100) +
-      ((gy2 + 399) ~/ 400) +
-      gd +
-      gDays[gm - 1];
-
-  int jy = -1595 + 33 * (days ~/ 12053);
-  days %= 12053;
-
-  jy += 4 * (days ~/ 1461);
-  days %= 1461;
-
-  if (days > 365) {
-    jy += (days - 1) ~/ 365;
-    days = (days - 1) % 365;
-  }
-
-  int jm;
-  int jd;
-
-  if (days < 186) {
-    jm = 1 + (days ~/ 31);
-    jd = 1 + (days % 31);
-  } else {
-    jm = 7 + ((days - 186) ~/ 30);
-    jd = 1 + ((days - 186) % 30);
-  }
-
-  return [jy, jm, jd];
-}
-
-String _toPersianDigits(String value) {
-  const english = '0123456789';
-  const persian = '۰۱۲۳۴۵۶۷۸۹';
-
-  return value.split('').map((char) {
-    final index = english.indexOf(char);
-    return index == -1 ? char : persian[index];
-  }).join();
-}
-
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  String? _name;
+  (int, int, int)? _birthdate;
+  int _unreadReplies = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final name = await NameService.getFullName();
+    final birthdate = await BirthdateService.getBirthdate();
+    final unread = await SupportService.getUnreadReplyCount();
+    if (!mounted) return;
+    setState(() {
+      _name = name;
+      _birthdate = birthdate;
+      _unreadReplies = unread;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,13 +57,23 @@ class HomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 30),
               children: [
-                const _TopBar(),
+                _TopBar(
+                  unreadReplies: _unreadReplies,
+                  onNotificationTap: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const SupportScreen()));
+                    _load();
+                  },
+                  onProfileTap: () async {
+                    await Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+                    _load();
+                  },
+                ),
                 const SizedBox(height: 4),
-                const _MoonHeader(),
+                _MoonHeader(name: _name, birthdate: _birthdate),
                 const SizedBox(height: 20),
                 const _TodayMessageCard(),
                 const SizedBox(height: 16),
-                _TodayCardAndLuckRow(),
+                _TodayCardAndLuckRow(birthdate: _birthdate),
                 const SizedBox(height: 16),
                 const DailyFortuneCard(),
                 const SizedBox(height: 20),
@@ -169,29 +94,66 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar();
+  final int unreadReplies;
+  final VoidCallback onNotificationTap;
+  final VoidCallback onProfileTap;
+
+  const _TopBar({
+    required this.unreadReplies,
+    required this.onNotificationTap,
+    required this.onProfileTap,
+  });
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: AppColors.glassFill,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.glassBorder),
+        InkWell(
+          borderRadius: BorderRadius.circular(21),
+          onTap: onNotificationTap,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: AppColors.glassFill,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.glassBorder),
+                ),
+                child: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary, size: 20),
+              ),
+              if (unreadReplies > 0)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(color: AppColors.error, shape: BoxShape.circle),
+                    child: Text(
+                      unreadReplies > 9 ? '۹+' : '$unreadReplies',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          child: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary, size: 20),
         ),
         Expanded(
           child: Center(child: Text('کواکب', style: AppTextStyles.displayMedium)),
         ),
-        Container(
-          width: 42,
-          height: 42,
-          decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.secondaryButtonGradient),
-          child: const Icon(Icons.person, color: Colors.white, size: 20),
+        InkWell(
+          borderRadius: BorderRadius.circular(21),
+          onTap: onProfileTap,
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: AppColors.secondaryButtonGradient),
+            child: const Icon(Icons.person, color: Colors.white, size: 20),
+          ),
         ),
       ],
     );
@@ -199,22 +161,41 @@ class _TopBar extends StatelessWidget {
 }
 
 class _MoonHeader extends StatelessWidget {
-  const _MoonHeader();
+  final String? name;
+  final (int, int, int)? birthdate;
+  const _MoonHeader({required this.name, required this.birthdate});
+
+  static const List<String> _weekdays = [
+    'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه', 'شنبه', 'یکشنبه',
+  ];
+  static const List<String> _jalaliMonths = [
+    'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+    'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+  ];
+
+  String get _todayDisplay {
+    final now = DateTime.now();
+    final jalali = gregorianToJalali(now.year, now.month, now.day);
+    final weekday = _weekdays[now.weekday - 1];
+    return '$weekday ${jalali.day} ${_jalaliMonths[jalali.month - 1]} ${jalali.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayName = (name != null && name!.trim().isNotEmpty) ? name!.trim() : 'کاربر کواکب';
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         const ZodiacWheel(size: 180),
         const SizedBox(height: 14),
-        Text('سلام مرتضی 🌙', style: AppTextStyles.headlineSmall),
+        Text('سلام $displayName 🌙', style: AppTextStyles.headlineSmall),
         const SizedBox(height: 6),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.textSecondary),
             const SizedBox(width: 6),
-            Text(_todayJalali(), style: AppTextStyles.bodySmall),
+            Text(_todayDisplay, style: AppTextStyles.bodySmall),
           ],
         ),
       ],
@@ -260,15 +241,16 @@ class _TodayMessageCard extends StatelessWidget {
 }
 
 class _TodayCardAndLuckRow extends StatelessWidget {
-  const _TodayCardAndLuckRow();
+  final (int, int, int)? birthdate;
+  const _TodayCardAndLuckRow({required this.birthdate});
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _TodayTarotCard()),
-        SizedBox(width: 12),
-        Expanded(child: _TodayLuckCard()),
+        const Expanded(child: _TodayTarotCard()),
+        const SizedBox(width: 12),
+        Expanded(child: _TodayLuckCard(birthdate: birthdate)),
       ],
     );
   }
@@ -367,9 +349,39 @@ class _TodayTarotCard extends StatelessWidget {
 }
 
 class _TodayLuckCard extends StatelessWidget {
-  const _TodayLuckCard();
+  final (int, int, int)? birthdate;
+  const _TodayLuckCard({required this.birthdate});
+
+  static const List<String> _colors = [
+    'قرمز', 'نارنجی', 'زرد', 'سبز', 'آبی', 'بنفش', 'صورتی', 'طلایی', 'فیروزه‌ای',
+  ];
+  static const List<Color> _colorSwatches = [
+    Color(0xFFD64545), Color(0xFFE0A63E), Color(0xFFE0D23E), Color(0xFF3E9C6E),
+    Color(0xFF3E9CE0), Color(0xFF8B4FE0), Color(0xFFE0507A), AppColors.gold, Color(0xFF3EC7C7),
+  ];
+  static const List<String> _hours = [
+    '۹:۰۰', '۱۱:۰۰', '۱۳:۰۰', '۱۵:۰۰', '۱۶:۳۰', '۱۸:۰۰', '۲۰:۰۰', '۲۱:۳۰',
+  ];
+  static const List<String> _elements = ['آب', 'آتش', 'خاک', 'باد'];
+
+  /// عدد پایه‌ای که هم به تاریخ تولد کاربر و هم به روز جاری بستگی داره —
+  /// یعنی هر کاربر با هر روز، عدد متفاوتی می‌گیره، ولی قطعی و بدون Random.
+  int _seed() {
+    final now = DateTime.now();
+    final dayOfYear = int.parse('${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}');
+    if (birthdate == null) return dayOfYear;
+    final (day, month, year) = birthdate!;
+    return dayOfYear + day * 31 + month * 12 + year;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final seed = _seed();
+    final colorIndex = seed % _colors.length;
+    final numberValue = (seed % 9) + 1;
+    final hourValue = _hours[seed % _hours.length];
+    final elementValue = _elements[seed % _elements.length];
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -391,11 +403,11 @@ class _TodayLuckCard extends StatelessWidget {
             children: [
               Text('شانس امروز', textAlign: TextAlign.center, style: AppTextStyles.cardLabel.copyWith(color: AppColors.gold)),
               const SizedBox(height: 18),
-              const _LuckItem(icon: Icons.circle, iconColor: Color(0xFF3E9CE0), label: 'رنگ پیشنهادی', value: 'آبی'),
+              _LuckItem(icon: Icons.circle, iconColor: _colorSwatches[colorIndex], label: 'رنگ پیشنهادی', value: _colors[colorIndex]),
               const SizedBox(height: 16),
-              const _LuckItem(icon: Icons.looks_one_outlined, iconColor: AppColors.gold, label: 'عدد شانس', value: '۷'),
+              _LuckItem(icon: Icons.looks_one_outlined, iconColor: AppColors.gold, label: 'عدد شانس', value: '$numberValue'),
               const SizedBox(height: 16),
-              const _LuckItem(icon: Icons.access_time_rounded, iconColor: Color(0xFF8B4FE0), label: 'ساعت مناسب', value: '۱۸:۰۰'),
+              _LuckItem(icon: Icons.access_time_rounded, iconColor: const Color(0xFF8B4FE0), label: 'ساعت مناسب', value: hourValue),
               const SizedBox(height: 16),
               const Divider(color: AppColors.glassBorder, height: 1),
               const SizedBox(height: 14),
@@ -404,7 +416,7 @@ class _TodayLuckCard extends StatelessWidget {
                 children: [
                   Icon(Icons.spa_outlined, size: 14, color: AppColors.gold.withOpacity(0.8)),
                   const SizedBox(width: 6),
-                  Text('عنصر امروز: آب', style: AppTextStyles.bodySmall),
+                  Text('عنصر امروز: $elementValue', style: AppTextStyles.bodySmall),
                 ],
               ),
             ],

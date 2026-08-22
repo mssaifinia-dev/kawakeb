@@ -53,4 +53,40 @@ class SupportService {
 
     return (rows as List).map((r) => SupportTicket.fromMap(r as Map<String, dynamic>)).toList();
   }
+
+  /// تعداد پاسخ‌های خوانده‌نشده (برای نشون قرمز روی زنگوله‌ی صفحه‌ی اصلی).
+  static Future<int> getUnreadReplyCount() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return 0;
+
+    try {
+      final rows = await supabase
+          .from('support_tickets')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('status', 'answered')
+          .eq('user_read', false);
+      return (rows as List).length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /// همه‌ی پاسخ‌های کاربر رو «خوانده‌شده» علامت می‌زنه (وقتی صفحه‌ی
+  /// پشتیبانی رو باز می‌کنه).
+  static Future<void> markAllRepliesRead() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await supabase
+          .from('support_tickets')
+          .update({'user_read': true})
+          .eq('user_id', user.id)
+          .eq('status', 'answered')
+          .eq('user_read', false);
+    } catch (e) {
+      // بی‌اهمیت؛ دفعه‌ی بعد دوباره تلاش می‌شه
+    }
+  }
 }

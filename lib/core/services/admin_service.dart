@@ -249,6 +249,7 @@ class AdminService {
     await supabase.from('support_tickets').update({
       'admin_reply': reply,
       'status': 'answered',
+      'user_read': false,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', ticketId);
   }

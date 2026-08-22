@@ -50,6 +50,7 @@ class _SupportScreenState extends State<SupportScreen> {
       _tickets = tickets;
       _loading = false;
     });
+    await SupportService.markAllRepliesRead();
   }
 
   Future<void> _submit() async {

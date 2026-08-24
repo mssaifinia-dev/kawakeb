@@ -5,6 +5,7 @@ import '../../../core/widgets/star_field_background.dart';
 import '../../../core/widgets/zodiac_wheel.dart';
 import '../../../core/services/name_service.dart';
 import '../../../core/services/birthdate_service.dart';
+import '../../../core/services/supabase_config.dart';
 import '../../../core/utils/persian_date_converter.dart';
 import '../../tarot/presentation/tarot_home_screen.dart';
 import '../../hafez/presentation/hafez_screen.dart';
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _name;
   (int, int, int)? _birthdate;
   int _unreadReplies = 0;
+  int _successfulReferrals = 0;
 
   @override
   void initState() {
@@ -39,11 +41,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final name = await NameService.getFullName();
     final birthdate = await BirthdateService.getBirthdate();
     final unread = await SupportService.getUnreadReplyCount();
+    int referrals = 0;
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      try {
+        final rows = await supabase.from('referral_credits').select('id').eq('referrer_id', user.id);
+        referrals = (rows as List).length;
+      } catch (_) {
+        referrals = 0;
+      }
+    }
     if (!mounted) return;
     setState(() {
       _name = name;
       _birthdate = birthdate;
       _unreadReplies = unread;
+      _successfulReferrals = referrals;
     });
   }
 
@@ -83,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 const _SaffatVersesCard(),
                 const SizedBox(height: 24),
-                const _StatsBar(),
+                _StatsBar(successfulReferrals: _successfulReferrals),
               ],
             ),
           ),
@@ -667,9 +680,20 @@ class _SaffatVersesCardState extends State<_SaffatVersesCard> {
 }
 
 class _StatsBar extends StatelessWidget {
-  const _StatsBar();
+  final int successfulReferrals;
+  const _StatsBar({required this.successfulReferrals});
+
   @override
   Widget build(BuildContext context) {
+    final points = successfulReferrals * 100;
+    final pointsDisplay = points.toString().replaceAllMapped(
+          RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
+        );
+    final subtitle = successfulReferrals == 0
+        ? 'دوستاتو دعوت کن، امتیاز بگیر'
+        : 'آفرین! عالی پیش می‌روی';
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
       decoration: BoxDecoration(
@@ -686,7 +710,7 @@ class _StatsBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('۲,۴۵۰', style: AppTextStyles.cardLabel),
+                Text(pointsDisplay, style: AppTextStyles.cardLabel),
                 Text('امتیاز کل', style: AppTextStyles.bodySmall),
               ],
             ),
@@ -698,13 +722,13 @@ class _StatsBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('۱۲ روز', style: AppTextStyles.cardLabel),
-                Text('آفرین! عالی پیش می‌روی', style: AppTextStyles.bodySmall),
+                Text('$successfulReferrals معرفی', style: AppTextStyles.cardLabel),
+                Text(subtitle, style: AppTextStyles.bodySmall),
               ],
             ),
           ),
           const SizedBox(width: 6),
-          const Icon(Icons.local_fire_department, color: Color(0xFFE0A63E), size: 26),
+          const Icon(Icons.people_alt_outlined, color: Color(0xFFE0A63E), size: 26),
         ],
       ),
     );

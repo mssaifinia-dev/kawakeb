@@ -55,6 +55,24 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    // بهترین اعتبار تخفیف معرفی که هنوز استفاده نشده رو پیدا کن (اگه داشت)
+    let discountPercent = 0;
+    let referralCreditId: string | null = null;
+    const { data: credits } = await supabaseAdmin
+      .from("referral_credits")
+      .select("id, discount_percent")
+      .eq("referrer_id", callerData.user.id)
+      .eq("redeemed", false)
+      .order("discount_percent", { ascending: false })
+      .limit(1);
+
+    if (credits && credits.length > 0) {
+      discountPercent = credits[0].discount_percent;
+      referralCreditId = credits[0].id;
+    }
+
+    const finalAmount = Math.round(plan.price_toman * (1 - discountPercent / 100));
+
     const callbackUrl = `${SUPABASE_URL}/functions/v1/zarinpal-verify`;
     const tierLabel = tier === "gold" ? "طلایی" : "VIP";
 
@@ -63,9 +81,9 @@ Deno.serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant_id: ZARINPAL_MERCHANT_ID,
-        amount: plan.price_toman,
+        amount: finalAmount,
         callback_url: callbackUrl,
-        description: `خرید اشتراک ${tierLabel} کواکب`,
+        description: `خرید اشتراک ${tierLabel} کواکب${discountPercent > 0 ? ` (${discountPercent}% تخفیف معرفی)` : ""}`,
       }),
     });
     const zpData = await zpRes.json();
@@ -82,10 +100,12 @@ Deno.serve(async (req: Request) => {
     await supabaseAdmin.from("payments").insert({
       user_id: callerData.user.id,
       tier,
-      amount_toman: plan.price_toman,
+      amount_toman: finalAmount,
       duration_days: plan.duration_days,
       authority,
       status: "pending",
+      discount_percent: discountPercent,
+      referral_credit_id: referralCreditId,
     });
 
     return new Response(

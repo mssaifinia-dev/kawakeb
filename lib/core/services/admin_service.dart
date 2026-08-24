@@ -304,4 +304,20 @@ class AdminService {
   static Future<void> deleteFeatureAccess(String featureKey) async {
     await supabase.from('feature_access').delete().eq('feature_key', featureKey);
   }
+
+  /// درصد تخفیف معرفی برای هر سطح اشتراک (gold/vip).
+  static Future<Map<String, int>> getReferralSettings() async {
+    final rows = await supabase.from('referral_settings').select('tier, discount_percent');
+    return {
+      for (final r in rows as List) (r['tier'] as String): (r['discount_percent'] as int),
+    };
+  }
+
+  static Future<void> updateReferralSetting(String tier, int discountPercent) async {
+    await supabase.from('referral_settings').upsert({
+      'tier': tier,
+      'discount_percent': discountPercent,
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+  }
 }

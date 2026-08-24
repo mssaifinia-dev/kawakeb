@@ -403,6 +403,18 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
           plan: vip,
           onSave: (price, days) => _savePlan('vip', price, days),
         ),
+        const SizedBox(height: 24),
+        Text('تخفیف معرفی (وقتی دوست معرفی‌شده اشتراک بخره)', style: AppTextStyles.cardLabel.copyWith(color: AppColors.gold)),
+        const SizedBox(height: 10),
+        _ReferralSettingsEditor(
+          onSave: (gold, vip) async {
+            await AdminService.updateReferralSetting('gold', gold);
+            await AdminService.updateReferralSetting('vip', vip);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ذخیره شد')));
+            }
+          },
+        ),
       ],
     );
   }
@@ -845,6 +857,98 @@ class _PlanEditorState extends State<_PlanEditor> {
               final days = int.tryParse(_daysController.text.trim()) ?? 30;
               widget.onSave(price, days);
             },
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReferralSettingsEditor extends StatefulWidget {
+  final Future<void> Function(int goldPercent, int vipPercent) onSave;
+  const _ReferralSettingsEditor({required this.onSave});
+
+  @override
+  State<_ReferralSettingsEditor> createState() => _ReferralSettingsEditorState();
+}
+
+class _ReferralSettingsEditorState extends State<_ReferralSettingsEditor> {
+  final _goldController = TextEditingController(text: '15');
+  final _vipController = TextEditingController(text: '25');
+  bool _loading = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final settings = await AdminService.getReferralSettings();
+    if (!mounted) return;
+    setState(() {
+      _goldController.text = (settings['gold'] ?? 15).toString();
+      _vipController.text = (settings['vip'] ?? 25).toString();
+      _loading = false;
+    });
+  }
+
+  @override
+  void dispose() {
+    _goldController.dispose();
+    _vipController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.gold));
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.glassFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.glassBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _goldController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(labelText: 'درصد تخفیف / دوست طلایی'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: TextField(
+                  controller: _vipController,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(labelText: 'درصد تخفیف / دوست VIP'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton(
+            onPressed: _saving
+                ? null
+                : () async {
+                    setState(() => _saving = true);
+                    final gold = int.tryParse(_goldController.text.trim()) ?? 0;
+                    final vip = int.tryParse(_vipController.text.trim()) ?? 0;
+                    await widget.onSave(gold, vip);
+                    if (mounted) setState(() => _saving = false);
+                  },
             child: const Text('ذخیره'),
           ),
         ],

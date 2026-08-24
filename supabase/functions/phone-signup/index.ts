@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { phone, password, name, birthdate, country, motherName } = await req.json();
+    const { phone, password, name, birthdate, country, motherName, referralCode } = await req.json();
 
     if (!phone || !password) {
       return new Response(
@@ -78,6 +78,27 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "خطا در ساخت حساب، دوباره تلاش کنید" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // اگه کد معرف داده شده، معرف رو پیدا کن و تو پروفایل کاربر جدید ثبتش کن
+    // (اگه کد اشتباه/نامعتبر بود، بی‌صدا نادیده می‌گیریم؛ ثبت‌نام نباید به‌خاطر این شکست بخوره)
+    if (referralCode && data.user?.id) {
+      try {
+        const { data: referrer } = await supabaseAdmin
+          .from("profiles")
+          .select("id")
+          .eq("referral_code", String(referralCode).toUpperCase().trim())
+          .maybeSingle();
+
+        if (referrer && referrer.id !== data.user.id) {
+          await supabaseAdmin
+            .from("profiles")
+            .update({ referred_by: referrer.id })
+            .eq("id", data.user.id);
+        }
+      } catch (refErr) {
+        console.error("referral lookup error:", refErr);
+      }
     }
 
     return new Response(

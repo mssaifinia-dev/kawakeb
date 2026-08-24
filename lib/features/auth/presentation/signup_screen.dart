@@ -90,6 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   final _motherNameController = TextEditingController();
+  final _referralCodeController = TextEditingController();
 
   // فیلدهای تاریخ تولد چندتقویمی
   _CalendarType _calendarType = _CalendarType.shamsi;
@@ -115,6 +116,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _confirmPasswordController.dispose();
     _nameController.dispose();
     _motherNameController.dispose();
+    _referralCodeController.dispose();
     _bdDayController.dispose();
     _bdMonthController.dispose();
     _bdYearController.dispose();
@@ -191,6 +193,9 @@ class _SignupScreenState extends State<SignupScreen> {
           'password': password,
           'name': _nameController.text.trim(),
           'motherName': _motherNameController.text.trim(),
+          'referralCode': _referralCodeController.text.trim().isEmpty
+              ? null
+              : _referralCodeController.text.trim(),
           'birthdate': '${resolved.year}-${resolved.month.toString().padLeft(2, '0')}-${resolved.day.toString().padLeft(2, '0')}',
           'country': _country.name,
         },
@@ -412,6 +417,17 @@ class _SignupScreenState extends State<SignupScreen> {
             hintText: 'نام مادر',
             prefixIcon: Icon(Icons.person_outline),
             helperText: 'برای فال جفر لازم است',
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _referralCodeController,
+          textAlign: TextAlign.right,
+          textCapitalization: TextCapitalization.characters,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            hintText: 'کد معرف (اختیاری)',
+            prefixIcon: Icon(Icons.card_giftcard_outlined),
           ),
         ),
         const SizedBox(height: 18),

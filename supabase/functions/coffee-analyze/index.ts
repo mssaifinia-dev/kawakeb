@@ -1,326 +1,193 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
+// ============================================================================
+// فال قهوه‌ی هوشمند — معماری دو مرحله‌ای
+// ============================================================================
+// چرا دو مرحله؟ از یه مدل تصویری خواستن که هم زیر لکه‌های مبهم شکل پیدا کنه
+// هم از بین چند دسته انتخاب کنه هم تعبیر بسازه، هم کند بود هم کم‌دقت —
+// چون همه‌ی این کارها با هم برای این نوع مدل سخته.
+//
+// راه‌حل: هر مدل فقط کاری که توش قویه رو انجام می‌ده:
+//   مرحله‌ی ۱ (مدل تصویری): فقط *توصیف* می‌کنه چی تو عکس می‌بینه — کار طبیعی
+//   یه مدل تصویری، نه دسته‌بندی انتزاعی.
+//   مرحله‌ی ۲ (مدل متنی سریع، همون llama-3.1-8b که تو تعبیر خواب هم داریم):
+//   اون توصیف رو می‌گیره، با ۲۰ نقش/تعبیر موجود پروژه مقایسه می‌کنه، و
+//   تعبیر نهایی رو با لحن خودمون می‌سازه.
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const MODEL = "@cf/google/gemma-4-26b-a4b-it";
+const VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct";
+const TEXT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-const SYSTEM_PROMPT = `
-تو یک فال‌گیر حرفه‌ای قهوه برای اپ «کواکب» هستی.
+// همون ۲۰ نقش و تعبیرِ دستچین‌شده‌ی موجود تو coffee_data.dart — این‌جا فقط
+// به‌عنوان مرجع برای مدل متنی استفاده می‌شه، جایگزینشون نمی‌کنه.
+const COFFEE_SYMBOLS: Record<string, string> = {
+  "قلب": "نشانه‌ی عشقی صادق یا اتفاقی شیرین در حوزه‌ی احساسات که به‌زودی رخ می‌دهد.",
+  "پرنده": "خبر خوش و پیامی مثبت در راه است؛ چیزی که مدتی منتظرش بودی.",
+  "درخت": "نشانه‌ی رشد پایدار، ریشه‌دار بودن تصمیمات و ثباتی که در حال شکل‌گیری‌ست.",
+  "ماهی": "نماد روزی و برکت مالی؛ فرصتی برای بهبود وضعیت اقتصادی نزدیک است.",
+  "کلید": "راه‌حلی که دنبالش بودی پیدا می‌شود؛ دری که تصور می‌کردی بسته است، باز خواهد شد.",
+  "ستاره": "شانس و موفقیت در راه است، به‌خصوص در موضوعی که اخیراً برایش تلاش کرده‌ای.",
+  "دایره": "نشانه‌ی کامل شدن یک دوره یا بازگشت چیزی از گذشته به شکلی تازه.",
+  "خط مواج": "سفر یا تغییری در پیش است؛ مسیر ممکن است پرپیچ‌وخم باشد اما به مقصد می‌رسی.",
+  "صلیب": "نشانه‌ی یک تصمیم دشوار یا دوراهی‌ست که باید با دقت بیشتری به آن فکر کنی.",
+  "تاج": "موفقیت، افتخار یا به‌رسمیت شناخته شدن تلاش‌هایت نزدیک است.",
+  "چتر": "نیاز به محافظت از خود در برابر مشکلی موقتی؛ محتاط باش اما نگران نباش.",
+  "لنگر": "ثبات و امنیتی که به دنبالش بودی، در حال رسیدن است؛ جایی برای تکیه کردن پیدا می‌کنی.",
+  "ماه": "دوره‌ای احساسی و درون‌گرایانه در پیش داری؛ به شهودت اعتماد کن.",
+  "خورشید": "نشانه‌ی شادی، موفقیت و روزهای روشن پیش‌رو؛ دوره‌ی خوبی در راه است.",
+  "پروانه": "تحولی مثبت در شخصیت یا زندگی‌ات در حال شکل‌گیری‌ست؛ استقبال کن.",
+  "مار": "هشداری برای مراقبت از یک فرد یا موقعیت که ممکن است صادق نباشد.",
+  "کوه": "چالشی بزرگ اما قابل عبور در راه است؛ با پشتکار به آن غلبه می‌کنی.",
+  "جاده": "مسیر روشنی پیش رویت باز می‌شود؛ زمان مناسبی برای تصمیم‌گیری قاطع است.",
+  "خانه": "ثبات خانوادگی، خبری درباره‌ی محل زندگی یا آرامشی که به آن نیاز داشتی.",
+  "حلقه": "نشانه‌ی تعهد، پیمانی تازه یا خبری مرتبط با ازدواج و روابط رسمی.",
+};
 
-وظیفه تو فقط این است:
-عکس فنجان قهوه را بررسی کن، مهم‌ترین نقش تفاله را پیدا کن و یک تعبیر فارسی جذاب بنویس.
-
-قوانین بسیار مهم:
-
-1. فقط زبان فارسی استفاده کن.
-2. انگلیسی ننویس.
-3. درباره فرایند فکر کردن یا تحلیل خودت چیزی نگو.
-4. reasoning یا توضیح داخلی خودت را نمایش نده.
-5. فقط نتیجه نهایی را بنویس.
-6. نقش را از روی چیزی که واقعاً در تصویر دیده می‌شود انتخاب کن.
-7. اگر نقش کاملاً واضح نیست، نزدیک‌ترین نقش قابل مشاهده را انتخاب کن.
-8. تعبیر باید سرگرم‌کننده و امیدوارکننده باشد و هیچ اتفاقی را قطعی اعلام نکند.
-
-فرمت پاسخ دقیقاً باید این باشد:
-
-نقش: [یک یا دو کلمه]
-
-تعبیر: [۴ تا ۶ جمله فارسی]
-
-تعبیر بهتر است به چند جنبه اشاره کند:
-- معنی سنتی نقش
-- اتفاق یا تغییر احتمالی
-- روابط و احساسات در صورت مرتبط بودن
-- کار و مسائل مالی در صورت مرتبط بودن
-- یک پایان امیدوارکننده
-
-از عبارت‌هایی مثل:
-«می‌تواند نشانه...»
-«ممکن است...»
-«در فال قهوه معمولاً...»
-استفاده کن.
-
-اگر تصویر اصلاً فنجان قهوه نیست:
-
-نقش: نامشخص
-
-تعبیر: تصویر فنجان قهوه قابل تشخیص نیست.
-
-فقط همین پاسخ نهایی را بده.
-هیچ JSON، Markdown، انگلیسی یا توضیح اضافه‌ای ننویس.
-`;
-
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json; charset=utf-8",
+async function agreeToLicense(accountId: string, token: string) {
+  await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${VISION_MODEL}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "agree" }),
     },
-  });
+  );
 }
 
-function cleanPersianResponse(text: string): string {
-  let result = text.trim();
+async function describeImage(
+  accountId: string,
+  token: string,
+  imageBytes: number[],
+): Promise<string> {
+  const prompt =
+    "این عکس ته‌مانده‌ی تفاله‌ی یه فنجان قهوه‌ی برگردانده‌ست. فقط توصیف کن دقیقاً چه خط‌ها، لکه‌ها و شکل‌هایی از تفاله می‌بینی (مثلاً خط منحنی، نقطه‌های پراکنده، شکل گرد، انشعاب‌های شاخه‌مانند). تفسیر نکن، فقط توصیف تصویری بده، حداکثر ۴ جمله.";
 
-  // حذف Markdown احتمالی
-  result = result.replace(/```[\s\S]*?```/g, "");
+  const call = async () =>
+    await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${VISION_MODEL}`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, image: imageBytes, max_tokens: 220 }),
+      },
+    );
 
-  // اگر مدل قبل از نقش چیزی نوشته باشد
-  const roleIndex = result.indexOf("نقش:");
+  let res = await call();
+  let data = await res.json();
 
-  if (roleIndex !== -1) {
-    result = result.substring(roleIndex);
+  const errText = JSON.stringify(data?.errors ?? "");
+  if (!res.ok || errText.toLowerCase().includes("agree") || errText.toLowerCase().includes("license")) {
+    await agreeToLicense(accountId, token);
+    res = await call();
+    data = await res.json();
   }
 
-  return result.trim();
+  return data?.result?.response ?? "";
 }
 
-function parseModelResponse(text: string) {
-  const cleaned = cleanPersianResponse(text);
+async function buildInterpretation(
+  accountId: string,
+  token: string,
+  visualDescription: string,
+): Promise<{ symbolName: string | null; interpretation: string }> {
+  const referenceList = Object.entries(COFFEE_SYMBOLS)
+    .map(([name, meaning]) => `- ${name}: ${meaning}`)
+    .join("\n");
 
-  const symbolMatch = cleaned.match(
-    /نقش\s*:\s*([^\n\r]+)/,
+  const systemPrompt = `تو یه فال‌گیر باتجربه‌ی قهوه‌ی ایرانی برای اپ «کواکب» هستی.
+یکی برات توصیف کرده تو فنجونش چه شکل‌هایی از تفاله می‌بینه. کارت اینه از بین نقش‌های سنتی زیر، نزدیک‌ترین‌شون رو به این توصیف پیدا کنی و یه تعبیر شخصی‌سازی‌شده بسازی (نه اینکه فقط متن آماده رو کپی کنی).
+
+نقش‌های سنتی و معنای پایه‌شون:
+${referenceList}
+
+قوانین:
+- اگه توصیف واقعاً به هیچ‌کدوم شبیه نبود یا خیلی مبهم بود، صادقانه بگو.
+- از عبارت‌هایی مثل «می‌تواند نشانه‌ی ... باشد» استفاده کن، نه ادعای قطعی.
+- خروجی فقط JSON با این دو کلید، بدون هیچ متن اضافه یا markdown:
+{"symbolName": "دقیقاً یکی از ۲۰ اسم بالا یا null", "interpretation": "۲ تا ۳ جمله، بر پایه‌ی توصیف واقعی کاربر"}`;
+
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${TEXT_MODEL}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `توصیف فنجانم: ${visualDescription}` },
+        ],
+        max_tokens: 300,
+      }),
+    },
   );
+  const data = await res.json();
+  const rawReply: string = data?.result?.response ?? "";
 
-  const interpretationMatch = cleaned.match(
-    /تعبیر\s*:\s*([\s\S]+)/,
-  );
-
-  let symbolName =
-    symbolMatch?.[1]?.trim() ?? null;
-
-  let interpretation =
-    interpretationMatch?.[1]?.trim() ?? "";
-
-  if (
-    symbolName?.toLowerCase() === "نامشخص" ||
-    symbolName === "نامشخص"
-  ) {
-    symbolName = null;
+  const jsonStart = rawReply.indexOf("{");
+  const jsonEnd = rawReply.lastIndexOf("}");
+  if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+    try {
+      const parsed = JSON.parse(rawReply.slice(jsonStart, jsonEnd + 1));
+      const name = typeof parsed?.symbolName === "string" ? parsed.symbolName.trim() : null;
+      const matched = name && COFFEE_SYMBOLS[name] ? name : null;
+      return {
+        symbolName: matched,
+        interpretation: parsed?.interpretation || "نتونستم تعبیر روشنی پیدا کنم، دوباره امتحان کن.",
+      };
+    } catch (_e) {
+      // پایین‌تر مدیریت می‌شه
+    }
   }
-
-  if (!interpretation) {
-    interpretation =
-      "تعبیر فنجان آماده نشد. لطفاً دوباره با نور بهتر عکس بگیر.";
-  }
-
-  return {
-    symbolName,
-    interpretation,
-  };
+  return { symbolName: null, interpretation: rawReply || "نتونستم فنجانت رو تحلیل کنم، دوباره امتحان کن." };
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", {
-      headers: corsHeaders,
-    });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const body = await req.json();
-
-    let imageBase64 = body?.imageBase64;
-
-    if (
-      typeof imageBase64 !== "string" ||
-      imageBase64.length < 100
-    ) {
-      return jsonResponse(
-        {
-          error: "تصویر معتبر نیست.",
-        },
-        400,
+    const { imageBase64 } = await req.json();
+    if (!imageBase64 || String(imageBase64).length < 100) {
+      return new Response(
+        JSON.stringify({ error: "تصویر معتبر نیست" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const token =
-      Deno.env.get("CLOUDFLARE_API_TOKEN");
-
-    const accountId =
-      Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
-
+    const token = Deno.env.get("CLOUDFLARE_API_TOKEN");
+    const accountId = Deno.env.get("CLOUDFLARE_ACCOUNT_ID");
     if (!token || !accountId) {
-      return jsonResponse(
-        {
-          error:
-            "تنظیمات Cloudflare کامل نیست.",
-        },
-        500,
+      return new Response(
+        JSON.stringify({ error: "Cloudflare secrets missing" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    // حذف data:image/... در صورت وجود
-    if (imageBase64.startsWith("data:image")) {
-      const commaIndex =
-        imageBase64.indexOf(",");
-
-      if (commaIndex !== -1) {
-        imageBase64 =
-          imageBase64.substring(
-            commaIndex + 1,
-          );
-      }
+    const binaryStr = atob(imageBase64);
+    const imageBytes = new Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      imageBytes[i] = binaryStr.charCodeAt(i);
     }
 
-    console.log(
-      `Coffee image received: ${imageBase64.length} base64 chars`,
-    );
+    // مرحله‌ی ۱: مدل تصویری فقط توصیف می‌کنه
+    const description = await describeImage(accountId, token, imageBytes);
 
-    const cloudflareUrl =
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`;
+    // مرحله‌ی ۲: مدل متنی سریع تعبیر نهایی رو می‌سازه
+    const result = await buildInterpretation(accountId, token, description);
 
-    const response = await fetch(
-      cloudflareUrl,
-      {
-        method: "POST",
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-
-        body: JSON.stringify({
-          messages: [
-            {
-              role: "system",
-              content: SYSTEM_PROMPT,
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text:
-                    "فنجان قهوه را بررسی کن و فقط نتیجه نهایی فارسی را بده.",
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url:
-                      `data:image/jpeg;base64,${imageBase64}`,
-                  },
-                },
-              ],
-            },
-          ],
-
-          /*
-           * برای اینکه reasoning بیش از حد طولانی نشود
-           * و پاسخ نهایی قطع نشود.
-           */
-          max_completion_tokens: 1536,
-
-          temperature: 0.3,
-        }),
-      },
-    );
-
-    const responseText =
-      await response.text();
-
-    console.log(
-      `Cloudflare status: ${response.status}`,
-    );
-
-    if (!response.ok) {
-      console.error(
-        `Cloudflare error: ${responseText}`,
-      );
-
-      let errorData: any = null;
-
-      try {
-        errorData =
-          JSON.parse(responseText);
-      } catch (_) {}
-
-      return jsonResponse(
-        {
-          error:
-            errorData?.errors?.[0]?.message ??
-            `Cloudflare error ${response.status}`,
-        },
-        502,
-      );
-    }
-
-    let data: any;
-
-    try {
-      data = JSON.parse(responseText);
-    } catch (_) {
-      return jsonResponse(
-        {
-          error:
-            "پاسخ Cloudflare قابل خواندن نیست.",
-        },
-        502,
-      );
-    }
-
-    const message =
-      data?.result?.choices?.[0]?.message;
-
-    /*
-     * بسیار مهم:
-     *
-     * reasoning_content را به کاربر نشان نمی‌دهیم.
-     *
-     * فقط content مجاز است.
-     */
-    const content =
-      message?.content;
-
-    console.log(
-      `Model content length: ${
-        typeof content === "string"
-          ? content.length
-          : 0
-      }`,
-    );
-
-    if (
-      typeof content !== "string" ||
-      content.trim().length === 0
-    ) {
-      return jsonResponse(
-        {
-          symbolName: null,
-          interpretation:
-            "مدل نتوانست پاسخ نهایی را آماده کند. لطفاً دوباره با نور بهتر از داخل فنجان عکس بگیر.",
-        },
-      );
-    }
-
-    console.log(
-      `Model final content: ${content}`,
-    );
-
-    const result =
-      parseModelResponse(content);
-
-    return jsonResponse(result);
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
-    console.error(
-      "Coffee Analyze Error:",
-      e,
-    );
-
-    return jsonResponse(
-      {
-        error:
-          e instanceof Error
-            ? e.message
-            : String(e),
-      },
-      500,
+    return new Response(
+      JSON.stringify({ error: e.toString() }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

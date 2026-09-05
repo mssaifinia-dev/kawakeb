@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/star_field_background.dart';
-import '../../../core/services/supabase_config.dart';
+import '../../../core/services/feature_access_service.dart';
 import '../../tarot/presentation/tarot_home_screen.dart';
 import '../../hafez/presentation/hafez_screen.dart';
 import '../../istikhara/presentation/istikhara_screen.dart';
@@ -58,26 +58,19 @@ class _FalListScreenState extends State<FalListScreen> {
 
   Future<void> _load() async {
     try {
-      final user = supabase.auth.currentUser;
-      String userTier = 'free';
-      if (user != null) {
-        final sub = await supabase
-            .from('subscriptions')
-            .select('tier')
-            .eq('user_id', user.id)
-            .maybeSingle();
-        if (sub != null) userTier = sub['tier'] as String;
-      }
+      // از منطق مرکزی استفاده می‌کنیم تا انقضای اشتراک هم
+      // دقیقاً مثل صفحه‌ی اصلی و پروفایل در نظر گرفته بشه.
+      final userTier = await FeatureAccessService.getCurrentUserTier();
 
-      final rows = await supabase.from('feature_access').select('feature_key, tier');
-      final map = <String, String>{
-        for (final r in rows as List) (r['feature_key'] as String): (r['tier'] as String),
-      };
+      final featureTiers = <String, String>{};
+      for (final key in _allFeatureKeys) {
+        featureTiers[key] = await FeatureAccessService.getRequiredTier(key);
+      }
 
       if (!mounted) return;
       setState(() {
         _userTier = userTier;
-        _featureTiers = map;
+        _featureTiers = featureTiers;
         _loading = false;
       });
     } catch (e) {
@@ -91,6 +84,13 @@ class _FalListScreenState extends State<FalListScreen> {
     }
   }
 
+  static const List<String> _allFeatureKeys = [
+    'tarot', 'hafez', 'istikhara', 'sar_ketab', 'dream_interpretation',
+    'love', 'coffee', 'candle', 'numerology', 'zodiac',
+    'chinese_zodiac', 'rashi', 'finance', 'career', 'angel',
+    'gypsy', 'abjad', 'saad_nahs', 'qamar_aqrab', 'jafr',
+  ];
+
   /// سطح لازم برای یک فال؛ اگه تو جدول تعریف نشده باشه، یعنی رایگانه.
   String _requiredTierFor(String key) => _featureTiers[key] ?? 'free';
 
@@ -100,30 +100,21 @@ class _FalListScreenState extends State<FalListScreen> {
     return userIndex >= requiredIndex;
   }
 
-  void _onTapItem(_FalItem item) {
-    final requiredTier = _requiredTierFor(item.key);
-    if (_isUnlocked(requiredTier)) {
-      Navigator.of(context).push(MaterialPageRoute(builder: item.builder));
-    } else {
-      _showUpgradeDialog(item, requiredTier);
-    }
-  }
-
-  void _showUpgradeDialog(_FalItem item, String requiredTier) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: Text(item.title),
-        content: Text(
-          'این فال مخصوص اشتراک ${_tierLabels[requiredTier]} است. برای دسترسی، اشتراکت رو ارتقا بده.',
-          textAlign: TextAlign.right,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('باشه')),
-        ],
-      ),
+  Future<void> _onTapItem(_FalItem item) async {
+    // از FeatureAccessService.open استفاده می‌کنیم — همون تابعی که
+    // تو صفحه‌ی اصلی استفاده می‌شه. این‌طوری دیالوگ «فعلاً نه/ارتقا
+    // بده» و رفتن مستقیم به پرداخت، دقیقاً یکسان و هماهنگ می‌مونه.
+    await FeatureAccessService.open(
+      context,
+      featureKey: item.key,
+      featureTitle: item.title,
+      builder: item.builder,
     );
+
+    // بعد از برگشتن (چه از صفحه‌ی فال، چه از صفحه‌ی خرید)، وضعیت
+    // اشتراک رو دوباره می‌خونیم تا اگه تازه خریده باشه، قفل‌ها
+    // بلافاصله باز بشن.
+    _load();
   }
 
   @override

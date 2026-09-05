@@ -4,6 +4,7 @@ import 'core/theme/app_theme.dart';
 import 'core/services/supabase_config.dart';
 import 'core/services/locale_service.dart';
 import 'core/services/locale_controller.dart';
+import 'core/services/browser_back_handler.dart';
 import 'features/splash/presentation/splash_screen.dart';
 import 'l10n/generated/app_localizations.dart';
 
@@ -15,6 +16,8 @@ void main() async {
   } catch (e) {
     debugPrint('Supabase error: $e');
   }
+
+  BrowserBackHandler.init();
 
   final localeCode = await LocaleService.getLocaleCode();
   LocaleController.notifier.value = Locale(localeCode);
@@ -36,6 +39,8 @@ class KawakibApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: AppTheme.darkTheme,
           locale: locale,
+          navigatorKey: BrowserBackHandler.navigatorKey,
+          navigatorObservers: [BrowserHistoryNavigatorObserver()],
           supportedLocales: const [Locale('fa'), Locale('en'), Locale('ar')],
           localizationsDelegates: const [
             AppLocalizations.delegate,

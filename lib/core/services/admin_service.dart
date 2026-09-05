@@ -1,4 +1,5 @@
 import 'supabase_config.dart';
+import 'feature_access_service.dart';
 
 class AdminUserRow {
   final String userId;
@@ -6,7 +7,8 @@ class AdminUserRow {
   final String? email;
   final String? phone;
   final String? motherName;
-  final String tier;
+  final String tier; // مقدار خام ذخیره‌شده تو دیتابیس
+  final DateTime? expiresAt;
   final DateTime? createdAt;
 
   const AdminUserRow({
@@ -16,8 +18,16 @@ class AdminUserRow {
     required this.phone,
     required this.motherName,
     required this.tier,
+    required this.expiresAt,
     required this.createdAt,
   });
+
+  bool get isExpired =>
+      expiresAt != null && expiresAt!.isBefore(DateTime.now());
+
+  /// سطح واقعی کاربر با در نظر گرفتن انقضا (همون منطق مرکزی
+  /// که تو FeatureAccessService استفاده می‌شه).
+  String get effectiveTier => FeatureAccessService.effectiveTierOf(tier, expiresAt);
 }
 
 class AdminStats {
@@ -101,16 +111,22 @@ class AdminService {
     }
   }
 
-  /// همه‌ی کاربران (از جدول profiles) به‌همراه سطح اشتراک فعلی‌شان.
+  /// همه‌ی کاربران (از جدول profiles) به‌همراه سطح اشتراک فعلی‌شان
+  /// و تاریخ انقضاشون (برای تشخیص منقضی‌شده‌ها).
   static Future<List<AdminUserRow>> getAllUsers() async {
     final profiles = await supabase
         .from('profiles')
         .select('id, email, phone, name, mother_name, created_at');
-    final subscriptions = await supabase.from('subscriptions').select('user_id, tier');
+    final subscriptions =
+        await supabase.from('subscriptions').select('user_id, tier, expires_at');
 
     final tierByUserId = <String, String>{};
+    final expiresByUserId = <String, DateTime?>{};
     for (final row in subscriptions as List) {
-      tierByUserId[row['user_id'] as String] = row['tier'] as String;
+      final userId = row['user_id'] as String;
+      tierByUserId[userId] = row['tier'] as String;
+      final expiresRaw = row['expires_at'] as String?;
+      expiresByUserId[userId] = expiresRaw != null ? DateTime.tryParse(expiresRaw) : null;
     }
 
     final rows = (profiles as List).map((row) {
@@ -123,6 +139,7 @@ class AdminService {
         phone: row['phone'] as String?,
         motherName: row['mother_name'] as String?,
         tier: tierByUserId[id] ?? 'free',
+        expiresAt: expiresByUserId[id],
         createdAt: createdAtRaw != null ? DateTime.tryParse(createdAtRaw) : null,
       );
     }).toList();
@@ -138,24 +155,28 @@ class AdminService {
     return rows;
   }
 
+  /// ادمین دستی سطح یه کاربر رو عوض می‌کنه.
+  /// expires_at رو خالی می‌ذاره چون این یه تخصیص دستیه، نه خرید —
+  /// یعنی تا خودت (ادمین) دوباره عوضش نکنی، منقضی نمی‌شه.
   static Future<void> setUserTier(String userId, String tier) async {
     final admin = supabase.auth.currentUser;
     await supabase.from('subscriptions').upsert({
       'user_id': userId,
       'tier': tier,
+      'expires_at': null,
       'granted_by': admin?.id,
       'updated_at': DateTime.now().toIso8601String(),
     });
   }
 
-  /// آمار خلاصه برای بالای پنل مدیریت: تعداد کل، تعداد هر سطح اشتراک،
-  /// و تعداد ثبت‌نام‌های هفته‌ی اخیر.
+  /// آمار خلاصه برای بالای پنل مدیریت: تعداد کل، تعداد هر سطح اشتراک
+  /// (با در نظر گرفتن انقضا)، و تعداد ثبت‌نام‌های هفته‌ی اخیر.
   static AdminStats computeStats(List<AdminUserRow> users) {
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
     int free = 0, gold = 0, vip = 0, newThisWeek = 0;
 
     for (final u in users) {
-      switch (u.tier) {
+      switch (u.effectiveTier) {
         case 'gold':
           gold++;
           break;
@@ -192,6 +213,9 @@ class AdminService {
   }
 
   /// قیمت یا مدت یک سطح اشتراک (gold یا vip) رو تغییر می‌ده.
+  /// این فقط رو خریدهای بعدی اثر می‌ذاره — چون expires_at هر
+  /// خرید موقع زمان خرید محاسبه و ذخیره می‌شه، نه هر بار از رو
+  /// تنظیمات فعلی. پس اشتراک‌های فعلی دست‌نخورده می‌مونن.
   static Future<void> updatePlan(String tier, {required int priceToman, required int durationDays}) async {
     await supabase.from('plans').upsert({
       'tier': tier,

@@ -7,7 +7,9 @@ import '../../../core/widgets/star_field_background.dart';
 import '../../../core/services/supabase_config.dart';
 
 class SubscriptionScreen extends StatefulWidget {
-  const SubscriptionScreen({super.key});
+  final String? preselectedTier;
+
+  const SubscriptionScreen({super.key, this.preselectedTier});
 
   @override
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
@@ -65,6 +67,17 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       _plans = map;
       _loading = false;
     });
+
+    // اگه از دیالوگ ارتقا با یه پلن مشخص اومده باشیم،
+    // و کاربر همین الان اون پلن رو فعال نداشته باشه،
+    // خودکار وارد فرآیند پرداخت همون پلن می‌شیم.
+    final preselected = widget.preselectedTier;
+    if (preselected != null) {
+      final alreadyHasIt = _currentTier == preselected && !_isExpired;
+      if (!alreadyHasIt && _plans[preselected] != null) {
+        _buy(preselected);
+      }
+    }
   }
 
   bool get _isExpired => _expiresAt != null && _expiresAt!.isBefore(DateTime.now());

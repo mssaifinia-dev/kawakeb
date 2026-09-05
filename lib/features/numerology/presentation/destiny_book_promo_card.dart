@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/feature_access_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../numerology/presentation/numerology_dashboard_screen.dart';
@@ -7,7 +8,6 @@ import '../../numerology/presentation/numerology_dashboard_screen.dart';
 /// که حس چیزی جادویی و منتظر کشف‌شدن را منتقل می‌کند.
 class DestinyBookPromoCard extends StatefulWidget {
   const DestinyBookPromoCard({super.key});
-
   @override
   State<DestinyBookPromoCard> createState() => _DestinyBookPromoCardState();
 }
@@ -15,7 +15,6 @@ class DestinyBookPromoCard extends StatefulWidget {
 class _DestinyBookPromoCardState extends State<DestinyBookPromoCard> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _glow;
-
   @override
   void initState() {
     super.initState();
@@ -35,8 +34,16 @@ class _DestinyBookPromoCardState extends State<DestinyBookPromoCard> with Single
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
+      // ⚠️ قبلاً مستقیم Navigator.push بود، بدون چک سطح اشتراک —
+      // یعنی کاربر رایگان هم می‌تونست از همین‌جا وارد بشه، حتی اگه
+      // تو پنل ادمین «کتاب سرنوشت» طلایی/VIP علامت خورده باشه.
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const NumerologyDashboardScreen()));
+        FeatureAccessService.open(
+          context,
+          featureKey: 'numerology',
+          featureTitle: 'کتاب سرنوشت',
+          builder: (_) => const NumerologyDashboardScreen(),
+        );
       },
       child: Container(
         width: double.infinity,

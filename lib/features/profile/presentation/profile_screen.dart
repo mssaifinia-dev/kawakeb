@@ -8,6 +8,7 @@ import '../../../core/services/name_service.dart';
 import '../../../core/services/locale_service.dart';
 import '../../../core/services/locale_controller.dart';
 import '../../../core/services/supabase_config.dart';
+import '../../../core/services/feature_access_service.dart';
 import '../../../core/utils/persian_date_converter.dart';
 import '../../auth/presentation/signup_screen.dart';
 import '../../admin/presentation/admin_screen.dart';
@@ -40,12 +41,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final birthdate = await BirthdateService.getBirthdate();
     final locale = await LocaleService.getLocaleCode();
 
-    String tier = 'free';
-    final user = supabase.auth.currentUser;
-    if (user != null) {
-      final sub = await supabase.from('subscriptions').select('tier').eq('user_id', user.id).maybeSingle();
-      if (sub != null) tier = sub['tier'] as String;
-    }
+    // از منطق مرکزی استفاده می‌کنیم تا انقضای اشتراک هم
+    // دقیقاً مثل چک دسترسی فال‌ها در نظر گرفته بشه.
+    final tier = await FeatureAccessService.getCurrentUserTier();
 
     if (!mounted) return;
     setState(() {

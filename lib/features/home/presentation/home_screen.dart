@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import '../../../core/services/feature_access_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/widgets/star_field_background.dart';
@@ -18,6 +18,7 @@ import '../../daily_fortune/presentation/daily_fortune_card.dart';
 import '../../numerology/presentation/destiny_book_promo_card.dart';
 import '../../support/presentation/support_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../ai_assistant/presentation/ai_assistant_screen.dart';
 
 import '../../../core/services/support_service.dart';
 import '../../../shared/placeholder_screen.dart';
@@ -85,12 +86,12 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _TopBar(
                   unreadReplies: _unreadReplies,
+                  // ⚠️ این قبلاً اشتباهاً به تعبیر خواب وصل شده بود؛
+                  // زنگوله باید به پشتیبانی بره، نه یه فال.
                   onNotificationTap: () async {
                     await Navigator.push(
                       context,
-                      MaterialPageRoute(
-                        builder: (_) => const SupportScreen(),
-                      ),
+                      MaterialPageRoute(builder: (_) => const SupportScreen()),
                     );
                     _load();
                   },
@@ -569,12 +570,13 @@ class _TodayTarotCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
+              // ⚠️ قبلاً مستقیم Navigator.push بود، بدون چک اشتراک.
               onPressed: () {
-                Navigator.push(
+                FeatureAccessService.open(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const TarotHomeScreen(),
-                  ),
+                  featureKey: 'tarot',
+                  featureTitle: 'تاروت',
+                  builder: (_) => const TarotHomeScreen(),
                 );
               },
               child: const Text('مشاهده تفسیر'),
@@ -821,58 +823,63 @@ class _LuckItem extends StatelessWidget {
 class _QuickActionsRow extends StatelessWidget {
   const _QuickActionsRow();
 
+  // ⚠️ قبلاً هر آیتم مستقیم Navigator.push می‌کرد، بدون چک اشتراک.
+  // الان همه (به‌جز دستیار هوشمند که فالِ قفل‌شونده نیست) از
+  // FeatureAccessService عبور می‌کنن، دقیقاً با همون featureKeyهایی
+  // که تو fal_list_screen.dart و پنل ادمین استفاده می‌شن.
+  //
+  // «دستیار هوشمند» قبلاً یه PlaceholderScreen با پیام «به‌زودی»
+  // باز می‌کرد. الان که دستیار هوشمند واقعی تو نوار پایین کار
+  // می‌کنه، مستقیم همون صفحه‌ی واقعی رو باز می‌کنیم.
   static final List<_QuickAction> _items = [
     _QuickAction(
       'فال حافظ',
       Icons.menu_book_outlined,
-      Color(0xFF6B2DD9),
+      const Color(0xFF6B2DD9),
       (context) {
-        Navigator.push(
+        FeatureAccessService.open(
           context,
-          MaterialPageRoute(
-            builder: (_) => const HafezScreen(),
-          ),
+          featureKey: 'hafez',
+          featureTitle: 'فال حافظ',
+          builder: (_) => const HafezScreen(),
         );
       },
     ),
     _QuickAction(
       'استخاره',
       Icons.circle_outlined,
-      Color(0xFF1E8E7E),
+      const Color(0xFF1E8E7E),
       (context) {
-        Navigator.push(
+        FeatureAccessService.open(
           context,
-          MaterialPageRoute(
-            builder: (_) => const IstikharaScreen(),
-          ),
+          featureKey: 'istikhara',
+          featureTitle: 'استخاره',
+          builder: (_) => const IstikharaScreen(),
         );
       },
     ),
     _QuickAction(
       'تعبیر خواب',
       Icons.nightlight_outlined,
-      Color(0xFF3E6FE0),
+      const Color(0xFF3E6FE0),
       (context) {
-        Navigator.push(
+        FeatureAccessService.open(
           context,
-          MaterialPageRoute(
-            builder: (_) => const DreamInterpretationScreen(),
-          ),
+          featureKey: 'dream_interpretation',
+          featureTitle: 'تعبیر خواب',
+          builder: (_) => const DreamInterpretationScreen(),
         );
       },
     ),
     _QuickAction(
       'دستیار هوشمند',
       Icons.auto_awesome,
-      Color(0xFF9C3EE0),
+      const Color(0xFF9C3EE0),
       (context) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => const PlaceholderScreen(
-              title: 'دستیار هوشمند',
-              icon: Icons.auto_awesome,
-            ),
+            builder: (_) => const AiAssistantScreen(),
           ),
         );
       },
@@ -1337,7 +1344,6 @@ class _KawakibFooter extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // نام کواکب
           Text(
             'کواکب',
             style: AppTextStyles.headlineSmall.copyWith(
@@ -1357,7 +1363,6 @@ class _KawakibFooter extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // لینک‌های پایین صفحه
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 4,
@@ -1407,7 +1412,6 @@ class _KawakibFooter extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // نمادها
           Wrap(
             alignment: WrapAlignment.center,
             crossAxisAlignment:
@@ -1415,7 +1419,6 @@ class _KawakibFooter extends StatelessWidget {
             spacing: 16,
             runSpacing: 14,
             children: [
-              // اینماد
               InkWell(
                 onTap: _openEnamad,
                 borderRadius: BorderRadius.circular(14),
@@ -1464,7 +1467,6 @@ class _KawakibFooter extends StatelessWidget {
                 ),
               ),
 
-              // زرین‌پال
               Container(
                 width: 115,
                 height: 105,

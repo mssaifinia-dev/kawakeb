@@ -6,6 +6,7 @@ import '../features/istikhara/presentation/istikhara_screen.dart';
 import '../features/learning/presentation/learning_list_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import 'placeholder_screen.dart';
+import '../core/services/browser_back_handler.dart';
 
 
 class MainNavigationScreen extends StatefulWidget {
@@ -29,8 +30,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     FalListScreen(),
 
     AiAssistantScreen(),
-      
-    
+
+
 
     LearningListScreen(),
 
@@ -38,6 +39,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   ];
 
+  @override
+  void initState() {
+    super.initState();
+
+    // دکمه/ژست برگشت گوشی: اگه رو تب خانه نیستیم، اول برگرد به
+    // تب خانه (رفتار استاندارد اپ‌های نوار پایین‌دار). فقط وقتی
+    // از قبل تو تب خانه‌ایم، اجازه می‌دیم از سایت خارج بشه.
+    BrowserBackHandler.rootBackInterceptor = () {
+      if (_currentIndex != 0) {
+        setState(() => _currentIndex = 0);
+        return true;
+      }
+      return false;
+    };
+  }
+
+  @override
+  void dispose() {
+    BrowserBackHandler.rootBackInterceptor = null;
+    super.dispose();
+  }
 
 
   void openIstikhara(){

@@ -71,9 +71,18 @@ Deno.serve(async (req: Request) => {
       referralCreditId = credits[0].id;
     }
 
-    const finalAmount = Math.round(plan.price_toman * (1 - discountPercent / 100));
+    // این عدد به «تومان» است — همون چیزی که تو دیتابیس (plans) و تو
+    // اپ به کاربر نشون داده می‌شه.
+    const finalAmountToman = Math.round(plan.price_toman * (1 - discountPercent / 100));
 
-    const callbackUrl = `${SUPABASE_URL}/functions/v1/zarinpal-verify`;
+    // ⚠️ زرین‌پال (بدون پارامتر جدا) عدد amount رو «ریال» حساب می‌کنه.
+    // چون قیمت‌های ما تو دیتابیس به تومانن، اینجا ضربدر ۱۰ می‌کنیم تا
+    // مبلغ واقعی و درست از کاربر گرفته بشه. (پارامتر currency:"IRT"
+    // رو امتحان کردیم ولی باعث خطای درگاه شد، پس به روش ریاضی ساده
+    // و سازگارتر برگشتیم.)
+    const finalAmountRial = finalAmountToman * 10;
+
+    const callbackUrl = `https://kawakeb.ir/payment-callback.html`;
     const tierLabel = tier === "gold" ? "طلایی" : "VIP";
 
     const zpRes = await fetch(`${API_BASE}/pg/v4/payment/request.json`, {
@@ -81,7 +90,7 @@ Deno.serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant_id: ZARINPAL_MERCHANT_ID,
-        amount: finalAmount,
+        amount: finalAmountRial,
         callback_url: callbackUrl,
         description: `خرید اشتراک ${tierLabel} کواکب${discountPercent > 0 ? ` (${discountPercent}% تخفیف معرفی)` : ""}`,
       }),
@@ -97,10 +106,12 @@ Deno.serve(async (req: Request) => {
 
     const authority = zpData.data.authority as string;
 
+    // تو دیتابیس همون مبلغ تومان رو ذخیره می‌کنیم (برای نمایش و تاریخچه)،
+    // نه مبلغ ریالی — چون amount_toman همه‌جای دیگه‌ی اپ به تومان استفاده می‌شه.
     await supabaseAdmin.from("payments").insert({
       user_id: callerData.user.id,
       tier,
-      amount_toman: finalAmount,
+      amount_toman: finalAmountToman,
       duration_days: plan.duration_days,
       authority,
       status: "pending",

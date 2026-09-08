@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>نتیجه‌ی پرداخت</title>
+  <style>
+    body{font-family:Tahoma,sans-serif;background:#0f0620;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}
+    .card{background:rgba(255,255,255,0.06);padding:40px;border-radius:20px;max-width:400px;}
+    h1{margin-bottom:14px;}
+    p{line-height:1.8;margin-bottom:24px;}
+    a.btn{
+      display:inline-block;
+      padding:14px 32px;
+      border-radius:12px;
+      background:#E0A63E;
+      color:#0f0620;
+      font-weight:bold;
+      text-decoration:none;
+      font-family:Tahoma,sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <h1 id="title">در حال بررسی...</h1>
+    <p id="message"></p>
+    <a class="btn" href="https://kawakeb.ir/">برگشت به اپ</a>
+  </div>
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var status = params.get("status");
+    var reason = params.get("reason");
+    var tier = params.get("tier");
+
+    var tierLabels = { gold: "طلایی", vip: "VIP" };
+
+    var titleEl = document.getElementById("title");
+    var messageEl = document.getElementById("message");
+    var h1El = document.getElementById("title");
+
+    function setResult(ok, title, message) {
+      h1El.style.color = ok ? "#E0A63E" : "#E0507A";
+      titleEl.textContent = (ok ? "\u2713 " : "\u2715 ") + title;
+      messageEl.textContent = message;
+    }
+
+    switch (status) {
+      case "success":
+        var label = tierLabels[tier] || tier || "";
+        setResult(true, "پرداخت موفق", "اشتراک " + label + " تو فعال شد. حالا می‌تونی به اپ برگردی.");
+        break;
+      case "cancelled":
+        setResult(false, "پرداخت لغو شد", "می‌تونی به اپ برگردی و دوباره تلاش کنی.");
+        break;
+      case "failed":
+        setResult(false, "پرداخت ناموفق", reason ? decodeURIComponent(reason) : "تراکنش تایید نشد.");
+        break;
+      case "not_found":
+        setResult(false, "خطا", "تراکنش یافت نشد.");
+        break;
+      case "no_authority":
+        setResult(false, "خطا", "اطلاعات پرداخت یافت نشد.");
+        break;
+      default:
+        setResult(false, "خطا", "مشکلی پیش اومد. با پشتیبانی تماس بگیر یا دوباره تلاش کن.");
+    }
+  </script>
+</body>
+</html>

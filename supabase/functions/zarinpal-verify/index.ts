@@ -6,17 +6,7 @@ const ZARINPAL_MERCHANT_ID = Deno.env.get("ZARINPAL_MERCHANT_ID")!;
 const ZARINPAL_SANDBOX = Deno.env.get("ZARINPAL_SANDBOX") === "true";
 
 const API_BASE = ZARINPAL_SANDBOX ? "https://sandbox.zarinpal.com" : "https://api.zarinpal.com";
-
-function htmlPage(title: string, message: string, ok: boolean) {
-  return `<!DOCTYPE html>
-<html lang="fa" dir="rtl"><head><meta charset="UTF-8"><title>${title}</title>
-<style>
-body{font-family:Tahoma,sans-serif;background:#0f0620;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center;}
-.card{background:rgba(255,255,255,0.06);padding:40px;border-radius:20px;max-width:400px;}
-h1{color:${ok ? "#E0A63E" : "#E0507A"};}
-</style></head>
-<body><div class="card"><h1>${ok ? "✓" : "✕"} ${title}</h1><p>${message}</p></div></body></html>`;
-}
+const RESULT_PAGE = "https://kawakeb.ir/payment-result.html";
 
 Deno.serve(async (req: Request) => {
   try {
@@ -25,9 +15,7 @@ Deno.serve(async (req: Request) => {
     const status = url.searchParams.get("Status");
 
     if (!authority) {
-      return new Response(htmlPage("خطا", "اطلاعات پرداخت یافت نشد.", false), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return Response.redirect(`${RESULT_PAGE}?status=no_authority`, 302);
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -39,16 +27,12 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (!payment) {
-      return new Response(htmlPage("خطا", "تراکنش یافت نشد.", false), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return Response.redirect(`${RESULT_PAGE}?status=not_found`, 302);
     }
 
     if (status !== "OK") {
       await supabaseAdmin.from("payments").update({ status: "failed" }).eq("authority", authority);
-      return new Response(htmlPage("پرداخت لغو شد", "می‌تونی به اپ برگردی و دوباره تلاش کنی.", false), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return Response.redirect(`${RESULT_PAGE}?status=cancelled`, 302);
     }
 
     // از زرین‌پال تایید نهایی می‌گیریم (این مرحله جلوی تقلب رو می‌گیره)
@@ -57,7 +41,7 @@ Deno.serve(async (req: Request) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         merchant_id: ZARINPAL_MERCHANT_ID,
-        amount: payment.amount_toman,
+        amount: payment.amount_toman * 10,
         authority,
       }),
     });
@@ -67,10 +51,8 @@ Deno.serve(async (req: Request) => {
     if (code !== 100 && code !== 101) {
       console.error("Zarinpal verify error:", JSON.stringify(verifyData));
       await supabaseAdmin.from("payments").update({ status: "failed" }).eq("authority", authority);
-      const reason = verifyData?.errors?.message ? `دلیل: ${verifyData.errors.message}` : "تراکنش تایید نشد.";
-      return new Response(htmlPage("پرداخت ناموفق", reason, false), {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      const reason = verifyData?.errors?.message ? encodeURIComponent(String(verifyData.errors.message)) : "";
+      return Response.redirect(`${RESULT_PAGE}?status=failed${reason ? `&reason=${reason}` : ""}`, 302);
     }
 
     // موفق بود: اشتراک رو خودکار فعال می‌کنیم
@@ -125,16 +107,9 @@ Deno.serve(async (req: Request) => {
       console.error("referral credit grant error:", refErr);
     }
 
-    const tierLabel = payment.tier === "gold" ? "طلایی" : "VIP";
-    return new Response(
-      htmlPage("پرداخت موفق", `اشتراک ${tierLabel} تو فعال شد. حالا می‌تونی به اپ برگردی.`, true),
-      { headers: { "Content-Type": "text/html; charset=utf-8" } },
-    );
+    return Response.redirect(`${RESULT_PAGE}?status=success&tier=${payment.tier}`, 302);
   } catch (err) {
     console.error("Unexpected zarinpal-verify error:", err);
-    return new Response(
-      htmlPage("خطا", "مشکلی پیش اومد. با پشتیبانی تماس بگیر یا دوباره تلاش کن.", false),
-      { headers: { "Content-Type": "text/html; charset=utf-8" } },
-    );
+    return Response.redirect(`${RESULT_PAGE}?status=error`, 302);
   }
 });

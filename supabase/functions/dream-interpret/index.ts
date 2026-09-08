@@ -14,6 +14,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// این دو پیام کوتاه به‌عمد با کد یونیکد (\u...) نوشته شدن، نه با حروف
+// فارسی مستقیم — چون چند بار کپی‌پیست این فایل باعث قطع‌شدن ناقص
+// رشته‌های فارسی وسط راه می‌شد (خطای پارس تایپ‌اسکریپت). این روش
+// کاملاً مستقل از هر مشکل کپی/انکودینگه.
+const MSG_DREAM_TOO_SHORT = "\u0645\u062a\u0646 \u062e\u0648\u0627\u0628 \u062e\u06cc\u0644\u06cc \u06a9\u0648\u062a\u0627\u0647 \u0627\u0633\u062a"; // متن خواب خیلی کوتاه است
+const MSG_NO_INTERPRETATION = "\u062a\u0639\u0628\u06cc\u0631\u06cc \u0628\u0631\u0627\u06cc \u0627\u06cc\u0646 \u062e\u0648\u0627\u0628 \u067e\u06cc\u062f\u0627 \u0646\u0634\u062f\u060c \u062f\u0648\u0628\u0627\u0631\u0647 \u062a\u0644\u0627\u0634 \u06a9\u0646."; // تعبیری برای این خواب پیدا نشد، دوباره تلاش کن.
+
 // ---- دیتای مرجع موجود پروژه (کپی سبک از dream_data.dart سمت Flutter) ----
 // این لیست کوتاه‌شده فقط برای «راهنمایی و زمینه‌سازی» به مدل داده می‌شود؛
 // مدل موظف است بر اساس متن واقعی خواب کاربر تعبیر یکپارچه بسازد، نه اینکه
@@ -86,7 +93,7 @@ serve(async (req) => {
 
     if (!dreamText || String(dreamText).trim().length < 3) {
       return new Response(
-        JSON.stringify({ error: "متن خواب خیلی کوتاه است" }),
+        JSON.stringify({ error: MSG_DREAM_TOO_SHORT }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
@@ -124,7 +131,24 @@ serve(async (req) => {
     );
 
     const data = await response.json();
-    const rawReply = data?.result?.response ?? "";
+
+    // ⚠️ قبلاً فرض می‌شد data.result.response همیشه یک رشته‌ی متنی
+    // ساده است. ظاهراً فرمت جواب Cloudflare AI برای این مدل تغییر
+    // کرده و گاهی یک شیء/آرایه برمی‌گرداند، که باعث خطای
+    // "rawReply.indexOf is not a function" می‌شد. اینجا مطمئن
+    // می‌شویم که همیشه با یک رشته کار می‌کنیم.
+    const rawResult = data?.result?.response;
+    let rawReply: string;
+    if (typeof rawResult === "string") {
+      rawReply = rawResult;
+    } else if (rawResult == null) {
+      rawReply = "";
+    } else {
+      // اگر شیء/آرایه بود، به رشته تبدیلش می‌کنیم تا حداقل بشه
+      // دنبال { ... } توش گشت، و برای دیباگ آینده لاگش می‌کنیم.
+      console.error("Unexpected Cloudflare AI response shape:", JSON.stringify(data));
+      rawReply = JSON.stringify(rawResult);
+    }
 
     // مدل‌های کوچک گاهی متن اضافه قبل/بعد از JSON می‌گذارند؛ فقط بخش { ... } را استخراج می‌کنیم.
     let parsed: Record<string, unknown> | null = null;
@@ -145,7 +169,7 @@ serve(async (req) => {
         JSON.stringify({
           summary: null,
           symbols: [],
-          fullInterpretation: rawReply || "تعبیری برای این خواب پیدا نشد، دوباره تلاش کن.",
+          fullInterpretation: rawReply || MSG_NO_INTERPRETATION,
           overallMessage: null,
           emotional: null,
           financial: null,

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>در حال بررسی پرداخت...</title>
+</head>
+<body style="font-family: sans-serif; text-align: center; padding-top: 80px; background: #0d0620; color: #fff;">
+  <p>در حال بررسی نتیجه‌ی پرداخت، لطفاً چند لحظه صبر کنید...</p>
+  <script>
+    // زرین‌پال کاربر رو به این صفحه (روی دامنه‌ی خودمون) برمی‌گردونه،
+    // چون فقط دامنه‌ی kawakeb.ir رو به رسمیت می‌شناسه. اینجا فوراً
+    // همون پارامترها (Authority, Status) رو به Edge Function واقعی
+    // روی Supabase پاس می‌دیم.
+    var target = "https://jwokttgkpftlvlmipaco.supabase.co/functions/v1/zarinpal-verify" + window.location.search;
+    window.location.replace(target);
+  </script>
+</body>
+</html>

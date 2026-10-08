@@ -86,6 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _TopBar(
                   unreadReplies: _unreadReplies,
+                  // ⚠️ این قبلاً اشتباهاً به تعبیر خواب وصل شده بود؛
+                  // زنگوله باید به پشتیبانی بره، نه یه فال.
                   onNotificationTap: () async {
                     await Navigator.push(
                       context,
@@ -568,6 +570,7 @@ class _TodayTarotCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
+              // ⚠️ قبلاً مستقیم Navigator.push بود، بدون چک اشتراک.
               onPressed: () {
                 FeatureAccessService.open(
                   context,
@@ -820,6 +823,14 @@ class _LuckItem extends StatelessWidget {
 class _QuickActionsRow extends StatelessWidget {
   const _QuickActionsRow();
 
+  // ⚠️ قبلاً هر آیتم مستقیم Navigator.push می‌کرد، بدون چک اشتراک.
+  // الان همه (به‌جز دستیار هوشمند که فالِ قفل‌شونده نیست) از
+  // FeatureAccessService عبور می‌کنن، دقیقاً با همون featureKeyهایی
+  // که تو fal_list_screen.dart و پنل ادمین استفاده می‌شن.
+  //
+  // «دستیار هوشمند» قبلاً یه PlaceholderScreen با پیام «به‌زودی»
+  // باز می‌کرد. الان که دستیار هوشمند واقعی تو نوار پایین کار
+  // می‌کنه، مستقیم همون صفحه‌ی واقعی رو باز می‌کنیم.
   static final List<_QuickAction> _items = [
     _QuickAction(
       'فال حافظ',

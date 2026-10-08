@@ -111,7 +111,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   List<AdminUserRow> get _filteredUsers {
     var list = _users;
     if (_tierFilter != 'all') {
-      list = list.where((u) => u.effectiveTier == _tierFilter).toList();
+      list = list.where((u) => u.tier == _tierFilter).toList();
     }
     if (_search.trim().isNotEmpty) {
       final query = _search.trim().toLowerCase();
@@ -313,8 +313,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
   }
 
   Widget _buildUserRow(AdminUserRow user) {
-    final effectiveTier = user.effectiveTier;
-    final tierColor = _tierColors[effectiveTier] ?? AppColors.textSecondary;
+    final tierColor = _tierColors[user.tier] ?? AppColors.textSecondary;
     final title = user.name?.trim().isNotEmpty == true
         ? user.name!
         : (user.phone ?? user.email ?? user.userId);
@@ -322,10 +321,6 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       if (user.phone != null && user.phone!.isNotEmpty) user.phone!,
       if (user.email != null && user.email!.isNotEmpty) user.email!,
     ];
-
-    // اگه تو دیتابیس هنوز طلایی/VIP ثبت شده ولی تاریخش گذشته،
-    // یه برچسب کوچیک قرمز نشون می‌دیم که ادمین بدونه غیرفعاله.
-    final showExpiredBadge = user.isExpired && user.tier != 'free';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -350,31 +345,12 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
                       overflow: TextOverflow.ellipsis),
                 ],
                 const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(_tierLabels[effectiveTier] ?? effectiveTier,
-                        style: AppTextStyles.bodySmall.copyWith(color: tierColor)),
-                    if (showExpiredBadge) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'منقضی (${_tierLabels[user.tier] ?? user.tier})',
-                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontSize: 9),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                Text(_tierLabels[user.tier] ?? user.tier, style: AppTextStyles.bodySmall.copyWith(color: tierColor)),
               ],
             ),
           ),
           DropdownButton<String>(
-            value: effectiveTier,
+            value: user.tier,
             dropdownColor: AppColors.surface,
             underline: const SizedBox(),
             items: _tiers
@@ -442,6 +418,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
       ],
     );
   }
+
   Widget _buildTicketsTab() {
     if (_tickets.isEmpty) {
       return Center(
@@ -717,6 +694,7 @@ class _AdminScreenState extends State<AdminScreen> with SingleTickerProviderStat
 
 const List<(String, String)> _knownFeatures = [
   ('tarot', 'تاروت'),
+  ('daily_tarot', 'کارت تاروت روز (صفحه اصلی)'),
   ('hafez', 'فال حافظ'),
   ('istikhara', 'استخاره'),
   ('sar_ketab', 'سرکتاب'),

@@ -1,3 +1,5 @@
+import 'dart:html' as html show window;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -99,8 +101,22 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         return;
       }
 
-      final url = Uri.parse(data!['paymentUrl'] as String);
-      await launchUrl(url, webOnlyWindowName: '_self');
+      final paymentUrl = data!['paymentUrl'] as String;
+
+      // ⚠️ نکته‌ی حیاتی: از url_launcher استفاده نمی‌کنیم چون تو وب اون
+      // پکیج پنجره رو با window.open(url, '_self', 'noopener,noreferrer')
+      // باز می‌کنه — یعنی هدر Referrer رو عمداً حذف می‌کنه. زرین‌پال (با
+      // مرچنت واقعی) این هدر رو برای تایید اینکه ناوبری واقعاً از دامنه‌ی
+      // ثبت‌شده (kawakeb.ir) اومده چک می‌کنه؛ بدون Referrer، صفحه‌ی
+      // StartPay خطای «دسترسی از این دامنه مجاز نیست» می‌ده.
+      // راه‌حل: ناوبری مستقیم مرورگر با window.location.href، که Referrer
+      // رو طبیعی نگه می‌داره.
+      if (kIsWeb) {
+        html.window.location.href = paymentUrl;
+      } else {
+        final url = Uri.parse(paymentUrl);
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {

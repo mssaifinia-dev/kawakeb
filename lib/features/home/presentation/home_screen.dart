@@ -947,6 +947,18 @@ class _DailyMissionCardState extends State<_DailyMissionCard> {
 // RELATIONSHIP PULSE — نبض رابطه
 // ============================================================
 
+class _RelationshipPerson {
+  final int slot;
+  final String name;
+  final (int, int, int) birthdate;
+
+  const _RelationshipPerson({
+    required this.slot,
+    required this.name,
+    required this.birthdate,
+  });
+}
+
 class _RelationshipPulseCard extends StatefulWidget {
   final (int, int, int)? ownBirthdate;
   const _RelationshipPulseCard({required this.ownBirthdate});
@@ -956,30 +968,72 @@ class _RelationshipPulseCard extends StatefulWidget {
 }
 
 class _RelationshipPulseCardState extends State<_RelationshipPulseCard> {
-  String? _personName;
-  (int, int, int)? _personBirthdate;
+  final List<_RelationshipPerson> _persons = [];
+  bool _loading = true;
 
-  int _score() {
+  @override
+  void initState() {
+    super.initState();
+    _loadPersons();
+  }
+
+  Future<void> _loadPersons() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+
+    try {
+      final rows = await supabase
+          .from('relationship_persons')
+          .select('slot,name,birth_day,birth_month,birth_year')
+          .eq('user_id', user.id)
+          .order('slot');
+
+      _persons
+        ..clear()
+        ..addAll((rows as List).map((row) {
+          return _RelationshipPerson(
+            slot: (row['slot'] as num).toInt(),
+            name: row['name'] as String,
+            birthdate: (
+              (row['birth_day'] as num).toInt(),
+              (row['birth_month'] as num).toInt(),
+              (row['birth_year'] as num).toInt(),
+            ),
+          );
+        }));
+    } catch (_) {
+      // اگر جدول هنوز ساخته نشده باشد، صفحه نباید از کار بیفتد.
+      _persons.clear();
+    }
+
+    if (mounted) setState(() => _loading = false);
+  }
+
+  int _score(_RelationshipPerson person) {
     final now = DateTime.now();
     var seed = now.year * 10000 + now.month * 100 + now.day;
     if (widget.ownBirthdate != null) {
       final (d, m, y) = widget.ownBirthdate!;
       seed += d * 17 + m * 29 + y * 3;
     }
-    if (_personBirthdate != null) {
-      final (d, m, y) = _personBirthdate!;
-      seed += d * 31 + m * 13 + y * 7;
-    }
+    final (d, m, y) = person.birthdate;
+    seed += d * 31 + m * 13 + y * 7 + person.slot * 19;
     return 55 + (seed.abs() % 46);
   }
 
-  Future<void> _configure() async {
-    final controller = TextEditingController(text: _personName ?? '');
+  Future<void> _configureSlot(int slot) async {
+    final existingIndex = _persons.indexWhere((p) => p.slot == slot);
+    final existing = existingIndex >= 0 ? _persons[existingIndex] : null;
+
+    final controller = TextEditingController(text: existing?.name ?? '');
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.surface,
-        title: const Text('نبض رابطه'),
+        title: Text('رابطه شماره $slot'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -987,35 +1041,298 @@ class _RelationshipPulseCardState extends State<_RelationshipPulseCard> {
           decoration: const InputDecoration(labelText: 'نام شخص'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('ادامه')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('ادامه'),
+          ),
         ],
       ),
     );
     controller.dispose();
     if (!mounted || name == null || name.isEmpty) return;
 
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime(1300),
-      lastDate: DateTime.now(),
-      initialDate: DateTime(1370),
-      helpText: 'تاریخ تولد شخص',
+    final picked = await _showJalaliDatePicker(
+      context,
+      initialDate: existing?.birthdate,
     );
     if (!mounted || picked == null) return;
 
-    // در این بخش برای سازگاری با مدل ذخیره‌شده‌ی اپ، تاریخ میلادی به‌صورت
-    // ساده نگه داشته می‌شود؛ تاریخ تولد خود کاربر از BirthdateService می‌آید.
-    setState(() {
-      _personName = name;
-      _personBirthdate = (picked.day, picked.month, picked.year);
-    });
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await supabase.from('relationship_persons').upsert(
+        {
+          'user_id': user.id,
+          'slot': slot,
+          'name': name,
+          'birth_day': picked.$1,
+          'birth_month': picked.$2,
+          'birth_year': picked.$3,
+        },
+        onConflict: 'user_id,slot',
+      );
+
+      final person = _RelationshipPerson(
+        slot: slot,
+        name: name,
+        birthdate: picked,
+      );
+
+      setState(() {
+        if (existingIndex >= 0) {
+          _persons[existingIndex] = person;
+        } else {
+          _persons.add(person);
+          _persons.sort((a, b) => a.slot.compareTo(b.slot));
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ذخیره اطلاعات رابطه انجام نشد. ابتدا جدول مربوط به نبض رابطه را در Supabase بسازید.')),
+      );
+    }
+  }
+
+  Future<void> _deleteSlot(_RelationshipPerson person) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        title: const Text('حذف رابطه'),
+        content: Text('اطلاعات «${person.name}» حذف شود؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      await supabase
+          .from('relationship_persons')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('slot', person.slot);
+      if (mounted) setState(() => _persons.removeWhere((p) => p.slot == person.slot));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('حذف اطلاعات انجام نشد.')),
+      );
+    }
+  }
+
+  Future<void> _managePersons() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('مدیریت نبض رابطه'),
+            content: SizedBox(
+              width: 460,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'می‌توانی تا ۵ نفر را ذخیره و هر زمان ویرایش کنی.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  for (var slot = 1; slot <= 5; slot++) ...[
+                    Builder(
+                      builder: (_) {
+                        final person = _persons.where((p) => p.slot == slot).firstOrNull;
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.gold.withOpacity(0.15),
+                            child: Text('$slot', style: const TextStyle(color: AppColors.gold)),
+                          ),
+                          title: Text(person?.name ?? 'شخص شماره $slot'),
+                          subtitle: person == null
+                              ? const Text('خالی')
+                              : Text('${person.birthdate.$3}/${person.birthdate.$2}/${person.birthdate.$1}'),
+                          trailing: person == null
+                              ? IconButton(
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  onPressed: () async {
+                                    Navigator.pop(dialogContext);
+                                    await _configureSlot(slot);
+                                  },
+                                )
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: () async {
+                                        Navigator.pop(dialogContext);
+                                        await _configureSlot(slot);
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete_outline),
+                                      onPressed: () async {
+                                        Navigator.pop(dialogContext);
+                                        await _deleteSlot(person);
+                                      },
+                                    ),
+                                  ],
+                                ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('بستن'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<(int, int, int)?> _showJalaliDatePicker(
+    BuildContext context, {
+    (int, int, int)? initialDate,
+  }) async {
+    const months = <String>[
+      'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
+      'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند',
+    ];
+
+    final now = DateTime.now();
+    final nowJ = gregorianToJalali(now.year, now.month, now.day);
+    var year = initialDate?.$3 ?? nowJ.year - 20;
+    var month = initialDate?.$2 ?? 1;
+    var day = initialDate?.$1 ?? 1;
+
+    int daysInMonth(int y, int m) {
+      if (m <= 6) return 31;
+      if (m <= 11) return 30;
+      final r = y % 33;
+      const leapRemainders = <int>{1, 5, 9, 13, 17, 22, 26, 30};
+      return leapRemainders.contains(r) ? 30 : 29;
+    }
+
+    day = day.clamp(1, daysInMonth(year, month));
+
+    return showDialog<(int, int, int)>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final maxDay = daysInMonth(year, month);
+          if (day > maxDay) day = maxDay;
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            title: const Text('تاریخ تولد شخص', textAlign: TextAlign.right),
+            content: Directionality(
+              textDirection: TextDirection.rtl,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<int>(
+                          value: day,
+                          decoration: const InputDecoration(labelText: 'روز'),
+                          items: [
+                            for (var d = 1; d <= maxDay; d++)
+                              DropdownMenuItem(value: d, child: Text('$d')),
+                          ],
+                          onChanged: (v) => v == null ? null : setDialogState(() => day = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<int>(
+                          value: month,
+                          decoration: const InputDecoration(labelText: 'ماه'),
+                          items: [
+                            for (var m = 1; m <= 12; m++)
+                              DropdownMenuItem(value: m, child: Text(months[m - 1])),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setDialogState(() {
+                                month = v;
+                                day = day.clamp(1, daysInMonth(year, month));
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: DropdownButtonFormField<int>(
+                          value: year,
+                          decoration: const InputDecoration(labelText: 'سال'),
+                          items: [
+                            for (var y = nowJ.year; y >= 1300; y--)
+                              DropdownMenuItem(value: y, child: Text('$y')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) {
+                              setDialogState(() {
+                                year = v;
+                                day = day.clamp(1, daysInMonth(year, month));
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text('تاریخ انتخاب‌شده: $year/$month/$day', style: AppTextStyles.bodySmall),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('انصراف')),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, (day, month, year)),
+                child: const Text('تأیید'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final configured = _personName != null && _personBirthdate != null;
-    final score = configured ? _score() : null;
+    final hasPersons = _persons.isNotEmpty;
+    final first = hasPersons ? _persons.first : null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1024,63 +1341,158 @@ class _RelationshipPulseCardState extends State<_RelationshipPulseCard> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.glassBorder),
       ),
-      child: Column(children: [
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.favorite_border, color: AppColors.gold, size: 18),
-          const SizedBox(width: 7),
-          Text('نبض رابطه', style: AppTextStyles.cardLabel.copyWith(color: AppColors.gold)),
-        ]),
-        const SizedBox(height: 10),
-        if (!configured)
-          Text('رابطه‌ات را تنظیم کن تا نبض امروز آن را ببینی.', textAlign: TextAlign.center, style: AppTextStyles.bodySmall)
-        else ...[
-          Text('امروز تو و $_personName', style: AppTextStyles.bodySmall),
-          const SizedBox(height: 4),
-          Text('$score٪', style: AppTextStyles.headlineSmall.copyWith(color: AppColors.gold)),
-          const SizedBox(height: 3),
-          Text(score! >= 85 ? 'هماهنگی امروز بالاست.' : score >= 70 ? 'امروز برای گفت‌وگوی آرام مناسب است.' : 'امروز کمی صبوری و درک متقابل بیشتر لازم است.', textAlign: TextAlign.center, style: AppTextStyles.bodySmall),
-        ],
-        const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          TextButton(onPressed: _configure, child: Text(configured ? 'تغییر شخص' : 'تنظیم رابطه')),
-          const SizedBox(width: 6),
-          OutlinedButton(
-            onPressed: () => FeatureAccessService.open(
-              context,
-              featureKey: 'relationship_pulse',
-              featureTitle: 'نبض رابطه',
-              builder: (_) => _RelationshipPulseFullScreen(personName: _personName, score: score),
-            ),
-            child: const Text('جزئیات'),
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.favorite_border, color: AppColors.gold, size: 18),
+              const SizedBox(width: 7),
+              Text('نبض رابطه', style: AppTextStyles.cardLabel.copyWith(color: AppColors.gold)),
+            ],
           ),
-        ]),
-      ]),
+          const SizedBox(height: 10),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else if (!hasPersons) ...[
+            Text(
+              'تا ۵ نفر را اضافه کن تا نبض رابطه هرکدام را جداگانه ببینی.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySmall,
+            ),
+          ] else ...[
+            for (final person in _persons) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 17,
+                      backgroundColor: AppColors.gold.withOpacity(0.15),
+                      child: const Icon(Icons.favorite, color: AppColors.gold, size: 16),
+                    ),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text('امروز با ${person.name}', style: AppTextStyles.bodySmall),
+                    ),
+                    Text(
+                      '${_score(person)}٪',
+                      style: AppTextStyles.cardLabel.copyWith(color: AppColors.gold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if (first != null) ...[
+              const SizedBox(height: 5),
+              Text(
+                _score(first) >= 85
+                    ? 'هماهنگی امروز بالاست.'
+                    : _score(first) >= 70
+                        ? 'امروز برای گفت‌وگوی آرام مناسب است.'
+                        : 'امروز کمی صبوری و درک متقابل بیشتر لازم است.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodySmall,
+              ),
+            ],
+          ],
+          const SizedBox(height: 12),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              FilledButton.icon(
+                onPressed: () {
+                  final empty = List.generate(5, (i) => i + 1)
+                      .firstWhere((slot) => !_persons.any((p) => p.slot == slot), orElse: () => 0);
+                  if (empty == 0) {
+                    _managePersons();
+                  } else {
+                    _configureSlot(empty);
+                  }
+                },
+                icon: const Icon(Icons.person_add_alt_1, size: 18),
+                label: Text(_persons.length >= 5 ? 'مدیریت ۵ نفر' : 'افزودن شخص'),
+              ),
+              OutlinedButton.icon(
+                onPressed: _managePersons,
+                icon: const Icon(Icons.people_outline, size: 18),
+                label: Text('مدیریت (${_persons.length}/۵)'),
+              ),
+              OutlinedButton(
+                onPressed: hasPersons
+                    ? () => FeatureAccessService.open(
+                          context,
+                          featureKey: 'relationship_pulse',
+                          featureTitle: 'نبض رابطه',
+                          builder: (_) => _RelationshipPulseFullScreen(
+                            persons: _persons,
+                            scoreBuilder: _score,
+                          ),
+                        )
+                    : null,
+                child: const Text('جزئیات'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _RelationshipPulseFullScreen extends StatelessWidget {
-  final String? personName;
-  final int? score;
-  const _RelationshipPulseFullScreen({required this.personName, required this.score});
+  final List<_RelationshipPerson> persons;
+  final int Function(_RelationshipPerson) scoreBuilder;
+
+  const _RelationshipPulseFullScreen({
+    required this.persons,
+    required this.scoreBuilder,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('نبض رابطه')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.favorite, color: AppColors.gold, size: 52),
-            const SizedBox(height: 16),
-            Text(personName == null ? 'رابطه هنوز تنظیم نشده' : 'نبض رابطه با $personName', textAlign: TextAlign.center, style: AppTextStyles.headlineSmall),
-            const SizedBox(height: 12),
-            if (score != null) Text('$score٪', style: AppTextStyles.displayMedium.copyWith(color: AppColors.gold)),
-            const SizedBox(height: 12),
-            Text('این نتیجه برای سرگرمی و خودشناسی است و مبنای قطعی برای تصمیم‌گیری درباره روابط نیست.', textAlign: TextAlign.center, style: AppTextStyles.bodySmall),
-          ]),
-        ),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(24),
+        itemCount: persons.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final person = persons[index];
+          final score = scoreBuilder(person);
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppColors.glassFill,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.glassBorder),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.favorite, color: AppColors.gold, size: 42),
+                const SizedBox(height: 10),
+                Text('نبض رابطه با ${person.name}', textAlign: TextAlign.center, style: AppTextStyles.headlineSmall),
+                const SizedBox(height: 8),
+                Text('$score٪', style: AppTextStyles.displayMedium.copyWith(color: AppColors.gold)),
+                const SizedBox(height: 6),
+                Text(
+                  score >= 85
+                      ? 'هماهنگی امروز بالاست.'
+                      : score >= 70
+                          ? 'امروز برای گفت‌وگوی آرام مناسب است.'
+                          : 'امروز کمی صبوری و درک متقابل بیشتر لازم است.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySmall,
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -1752,7 +2164,6 @@ class _KawakibFooter extends StatelessWidget {
                             'مشکلات پرداخت و اشتراک، فعال نشدن امکانات، مشکلات حساب کاربری، خطاهای برنامه، پیشنهادها و گزارش مشکلات فنی از طریق پشتیبانی قابل پیگیری هستند.',
                       ),
                     ],
-
                   );
                 },
                 child: const Text('تماس با ما'),
